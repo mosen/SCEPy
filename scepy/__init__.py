@@ -41,7 +41,7 @@ class WSGIChunkedBodyCopy(object):
 
 app = Flask(__name__)
 app.config.from_object('scepy.default_settings')
-app.config.from_envvar('SCEPY_SETTINGS')
+app.config.from_envvar('SCEPY_SETTINGS', True)
 app.wsgi_app = WSGIChunkedBodyCopy(app.wsgi_app)
 
 with app.app_context():
