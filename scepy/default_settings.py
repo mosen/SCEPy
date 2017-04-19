@@ -1,0 +1,8 @@
+SCEP_CA_CN = 'SCEPY-CA'
+SCEP_CA_O = 'SCEPy'
+SCEP_CA_C = 'AU'
+
+SCEP_CHALLENGE = 'sekret'
+CA_ROOT = '/tmp/ca'
+
+FORCE_DEGENERATE_FOR_SINGLE_CERT = False
