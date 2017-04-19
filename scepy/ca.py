@@ -8,7 +8,6 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from asn1crypto.cms import SignerIdentifier, IssuerAndSerialNumber
-from oscrypto.asymmetric import load_certificate, load_private_key, generate_pair, Certificate
 
 STORAGE_DIRS = [
     'certs',
@@ -31,21 +30,22 @@ class CertificateAuthority(object):
     ])
 
     @classmethod
-    def load_or_create(cls, path: str, subject: x509.Name = default_subject, key_size: int = 2048):
+    def load_or_create(cls, base_path: str, subject: x509.Name = default_subject, key_size: int = 2048):
         """Load or create a certificate authority at path
 
         Generates a new private key and self-signs a CA certificate.
 
         Args:
-            path (str): The base path where the CA will be stored.
+            base_path (str): The base path where the CA will be stored.
             subject (cryptography.x509.Name): The subject of the CA
             key_size (int): The RSA private key size integer, default is 2048.
 
         Returns:
             Instance of CertificateAuthority
         """
-        key_path = os.path.join(path, 'private', 'ca.key.pem')
-        cert_path = os.path.join(path, 'certs', 'ca.cer')
+        key_path = os.path.join(base_path, 'private', 'ca.key.pem')
+        cert_path = os.path.join(base_path, 'certs', 'ca.cer')
+        serial_path = os.path.join(base_path, 'private', 'serial.txt')
 
         if os.path.exists(key_path):
             with open(key_path, 'rb') as key_file:
@@ -98,10 +98,22 @@ class CertificateAuthority(object):
                 True
             ).sign(private_key, hashes.SHA256(), default_backend())
 
-        ca = cls(path, certificate, private_key)
+        if os.path.exists(serial_path):
+            with open(serial_path, 'r') as fd:
+                line = fd.read()
+                if len(line) > 0:
+                    serial = int(line)
+                else:
+                    serial = 1
+        else:
+            serial = 1
+            with open(serial_path, 'w+') as fd:
+                fd.write(str(serial))
+
+        ca = cls(base_path, certificate, private_key, None, serial)
         return ca
 
-    def __init__(self, path: str, certificate: x509.Certificate, private_key: rsa.RSAPrivateKeyWithSerialization, password=None):
+    def __init__(self, path: str, certificate: x509.Certificate, private_key: rsa.RSAPrivateKeyWithSerialization, password=None, serial=1):
         """
         Args:
             path: Storage path
@@ -113,7 +125,20 @@ class CertificateAuthority(object):
         self._path = path
         self._certificate = certificate
         self._private_key = private_key
+        self._serial = serial
         self._persist_ca(self._certificate, self._private_key, password)
+
+    @property
+    def serial(self):
+        return self._serial
+
+    @serial.setter
+    def serial(self, value: int):
+        self._serial = value
+        serial_path = os.path.join(self.path, 'private', 'serial.txt')
+        with open(serial_path, 'w+') as fd:
+            fd.write(str(self._serial))
+            
 
     @property
     def path(self):
@@ -148,6 +173,12 @@ class CertificateAuthority(object):
             )
             fd.write(key_bytes)
 
+    def _persist_issued(self, certificate: x509.Certificate):
+        """Persist an issued certificate to the ``newcerts`` directory."""
+        cert_path = os.path.join(self._path, 'newcerts', '{}.cer'.format(certificate.serial_number))
+        with open(cert_path, 'wb') as fd:
+            fd.write(certificate.public_bytes(serialization.Encoding.PEM))
+
     def signer_identifier(self) -> SignerIdentifier:
         """Get the identity of this CA instance as a SignerIdentifier structure for CMS."""
         ias = IssuerAndSerialNumber()
@@ -174,9 +205,14 @@ class CertificateAuthority(object):
             datetime.datetime.utcnow()
         ).not_valid_after(
             datetime.datetime.utcnow() + datetime.timedelta(days=30)
-        ).serial_number(x509.random_serial_number()).public_key(
+        ).serial_number(
+            self.serial
+        ).public_key(
             csr.public_key()
         ).sign(self.private_key, hashes.SHA256(), default_backend())
+
+        self._persist_issued(cert)
+        self.serial = self.serial + 1
 
         return cert
 
