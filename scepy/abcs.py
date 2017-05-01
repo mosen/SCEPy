@@ -7,36 +7,36 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 class CertificateAuthorityStorage(object):
     __metaclass__ = ABCMeta
 
-    @abstractmethod
     @property
+    @abstractmethod
     def private_key(self) -> Union[None, rsa.RSAPrivateKey]:
         """Retrieve the RSA Private key (If available)"""
         pass
 
-    @abstractmethod
     @private_key.setter
+    @abstractmethod
     def private_key(self, private_key: rsa.RSAPrivateKey):
         pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def ca_certificate(self) -> Union[None, x509.Certificate]:
         """Retrieve the CA Certificate (If available)"""
         pass
 
-    @abstractmethod
     @ca_certificate.setter
+    @abstractmethod
     def ca_certificate(self, certificate: x509.Certificate):
         pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def serial(self) -> int:
         """Retrieve the CURRENT serial number (not the next available)."""
         pass
 
-    @abstractmethod
     @serial.setter
+    @abstractmethod
     def serial(self, no: int):
         """Set the CURRENT serial number (not the next available)."""
         pass

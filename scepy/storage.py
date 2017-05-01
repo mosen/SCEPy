@@ -17,7 +17,15 @@ class FileStorage(CertificateAuthorityStorage):
     """
 
     def __init__(self, base_path: str, password: Union[None, str] = None):
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
+            
         self._base_path = base_path
+
+        for p in ['private', 'certs', 'newcerts']:
+            if not os.path.exists(os.path.join(base_path, p)):
+                os.mkdir(os.path.join(base_path, p))
+                
         self._key_path = os.path.join(base_path, 'private', 'ca.key.pem')
         self._cert_path = os.path.join(base_path, 'certs', 'ca.cer')
         self._issued_path = os.path.join(base_path, 'newcerts')

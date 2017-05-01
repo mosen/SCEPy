@@ -79,7 +79,8 @@ class CertificateAuthority(object):
 
         storage.ca_certificate = certificate
 
-        ca = cls()
+        ca = cls(storage)
+        return ca
 
     def __init__(self, storage: CertificateAuthorityStorage):
         """
