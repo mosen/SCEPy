@@ -11,6 +11,8 @@ from .enums import MessageType, PKIStatus, FailInfo
 from .builders import PKIMessageBuilder, Signer, create_degenerate_certificate
 from .envelope import PKCSPKIEnvelopeBuilder
 
+from .admin import admin_app
+
 CACAPS = ('POSTPKIOperation', 'SHA-256', 'AES')
 
 
@@ -43,6 +45,7 @@ app = Flask(__name__)
 app.config.from_object('scepy.default_settings')
 app.config.from_envvar('SCEPY_SETTINGS', True)
 app.wsgi_app = WSGIChunkedBodyCopy(app.wsgi_app)
+app.register_blueprint(admin_app)
 
 with app.app_context():
     g.ca = ca_from_storage(app.config['CA_ROOT'])
