@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, IntEnum
 
 class MessageType(Enum):
     """The SCEP Message Type.
@@ -80,3 +80,22 @@ class CACaps(Enum):
     SHA512 = 'SHA-512'
     SCEPStandard = 'SCEPStandard'
     Update = 'Update'
+
+
+class RevocationReason(IntEnum):
+    """RFC 5280 - Reasons for Certificate Revocation
+    
+    See Also:
+          - `https://tools.ietf.org/html/rfc5280`_.
+    """
+    unspecified = 0
+    key_compromise = 1
+    ca_compromise = 2
+    affiliation_changed = 3
+    superseded = 4
+    cessation_of_operation = 5
+    certificate_hold = 6
+    remove_from_crl = 8
+    privilege_withdrawn = 9
+    aa_compromise = 10
+

@@ -2,6 +2,7 @@ from typing import Union
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
+from scepy import models
 from .abcs import CertificateAuthorityStorage
 import os
 from cryptography import x509
@@ -117,4 +118,10 @@ class FileStorage(CertificateAuthorityStorage):
 
 class SQLAlchemyStorage(CertificateAuthorityStorage):
     """SQLAlchemyStorage implements a database driven Certificate Authority storage."""
-    pass
+
+    def __init__(self, db):
+        self._db = db
+
+    @property
+    def ca_certificate(self) -> Union[None, x509.Certificate]:
+        pass
