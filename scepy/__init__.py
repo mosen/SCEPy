@@ -60,7 +60,12 @@ def scep():
     if storage.exists():
         g.ca = CertificateAuthority(storage)
     else:
-        g.ca = CertificateAuthority.create(storage)
+        subject = x509.Name([
+            x509.NameAttribute(x509.NameOID.COMMON_NAME, app.config['CA_X509_CN']),
+            x509.NameAttribute(x509.NameOID.ORGANIZATION_NAME, app.config['CA_X509_O']),
+            x509.NameAttribute(x509.NameOID.COUNTRY_NAME, app.config['CA_X509_C'])
+        ])
+        g.ca = CertificateAuthority.create(storage, subject)
     ca = g.ca
 
     if op == 'GetCACert':
@@ -106,19 +111,32 @@ def scep():
             req_info_bytes = cert_req.tbs_certrequest_bytes
 
             # Check the challenge password
-            req_info = CertificationRequestInfo.load(req_info_bytes)
-            for attr in req_info['attributes']:
-                if attr['type'].native == 'challenge_password':
-                    assert len(attr['values']) == 1
-                    challenge_password = attr['values'][0].native
-                    print("{:<20}: {}".format('Challenge Password', challenge_password))
-                    break  # TODO: if challenge password fails send pkcs#7 with pki status failure
+            if 'SCEP_CHALLENGE' in app.config:
+                req_info = CertificationRequestInfo.load(req_info_bytes)
+                for attr in req_info['attributes']:
+                    if attr['type'].native == 'challenge_password':
+                        assert len(attr['values']) == 1
+                        challenge_password = attr['values'][0].native
+                        if challenge_password != app.config['SCEP_CHALLENGE']:
+                            signer = Signer(cacert, cakey)
+                            reply = PKIMessageBuilder().message_type(
+                                MessageType.CertRep
+                            ).transaction_id(
+                                req.transaction_id
+                            ).pki_status(
+                                PKIStatus.FAILURE, FailInfo.BadRequest
+                            ).recipient_nonce(
+                                req.sender_nonce
+                            ).add_signer(signer).finalize()
+
+                            return Response(reply.dump(), mimetype='application/x-pki-message')
+                        break
 
             # CA should persist all signed certs itself
             new_cert = ca.sign(cert_req)
             degenerate = create_degenerate_certificate(new_cert)
-            with open('/tmp/degenerate.der', 'wb') as fd:
-                fd.write(degenerate.dump())
+            # with open('/tmp/degenerate.der', 'wb') as fd:
+            #     fd.write(degenerate.dump())
 
             envelope, _, _ = PKCSPKIEnvelopeBuilder().encrypt(degenerate.dump()).add_recipient(
                 req.certificates[0]).finalize()
@@ -136,12 +154,12 @@ def scep():
                 envelope
             ).certificates(new_cert).add_signer(signer).finalize()
 
-            res = SCEPMessage.parse(reply.dump())
-            app.logger.debug('Reply with CertRep, details follow')
-            res.debug()
+            # res = SCEPMessage.parse(reply.dump())
+            # app.logger.debug('Reply with CertRep, details follow')
+            # res.debug()
 
-            with open('/tmp/reply.bin', 'wb') as fd:
-                fd.write(reply.dump())
+            # with open('/tmp/reply.bin', 'wb') as fd:
+            #     fd.write(reply.dump())
 
             return Response(reply.dump(), mimetype='application/x-pki-message')
         else:

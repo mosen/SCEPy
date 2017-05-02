@@ -1,8 +1,22 @@
-SCEP_CA_CN = 'SCEPY-CA'
-SCEP_CA_O = 'SCEPy'
-SCEP_CA_C = 'AU'
+# Flask based settings
+DEBUG = True
 
+# Directory where certs, revocation lists, serials etc will be kept
+CA_ROOT = "/tmp/ca"
+
+# X.509 Name Attributes used to generate the CA Certificate
+CA_X509_CN = 'SCEPY-CA'
+CA_X509_O = 'SCEPy'
+CA_X509_C = 'AU'
+
+# SubjectAltName extension is always on and will use this DNSName
+SAN_DNSNAME = 'scepy.dev'
+
+# Listen port
+PORT = 5000
+
+# (Optional) SCEP static challenge
 SCEP_CHALLENGE = 'sekret'
-CA_ROOT = '/tmp/ca'
+
 
 FORCE_DEGENERATE_FOR_SINGLE_CERT = False
