@@ -6,15 +6,9 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
+from .abcs import CertificateAuthorityStorage
 
 from asn1crypto.cms import SignerIdentifier, IssuerAndSerialNumber
-
-STORAGE_DIRS = [
-    'certs',
-    'crl',
-    'newcerts',
-    'private'
-]
 
 
 class CertificateAuthority(object):
@@ -30,153 +24,88 @@ class CertificateAuthority(object):
     ])
 
     @classmethod
-    def load_or_create(cls, base_path: str, subject: x509.Name = default_subject, key_size: int = 2048):
-        """Load or create a certificate authority at path
-
-        Generates a new private key and self-signs a CA certificate.
-
+    def create(cls, storage: CertificateAuthorityStorage, subject: x509.Name = default_subject, key_size: int = 2048,
+               validity_period: datetime.timedelta = datetime.timedelta(days=365)):
+        """Create and persist a Certificate Authority using the given storage backend.
+        
         Args:
-            base_path (str): The base path where the CA will be stored.
-            subject (cryptography.x509.Name): The subject of the CA
-            key_size (int): The RSA private key size integer, default is 2048.
-
+              storage (CertificateAuthorityStorage): The storage backend to persist the CA key and certificates.
+              subject (x509.Name): The subject of the CA certificate.
+              key_size (int): The RSA Private key size in bits, default is 2048
+              validity_period (timedelta): The timedelta indicating the number of days validity to add to the current
+                date.
+                
         Returns:
-            Instance of CertificateAuthority
+              CertificateAuthority
         """
-        key_path = os.path.join(base_path, 'private', 'ca.key.pem')
-        cert_path = os.path.join(base_path, 'certs', 'ca.cer')
-        serial_path = os.path.join(base_path, 'private', 'serial.txt')
 
-        if os.path.exists(key_path):
-            with open(key_path, 'rb') as key_file:
-                private_key = serialization.load_pem_private_key(
-                    data=key_file.read(),
-                    password=None,
-                    backend=default_backend()
-                )
-        else:
-            private_key = rsa.generate_private_key(
-                public_exponent=65537,
-                key_size=key_size,
-                backend=default_backend(),
-            )
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=key_size,
+            backend=default_backend(),
+        )
+        storage.private_key = private_key
+        
+        certificate = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            subject
+        ).public_key(
+            private_key.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.utcnow()
+        ).not_valid_after(
+            datetime.datetime.utcnow() + validity_period
+        ).add_extension(
+            x509.BasicConstraints(ca=True, path_length=None),
+            True
+        ).add_extension(
+            #  Absolutely critical for SCEP
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=True,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False
+            ),
+            True
+        ).sign(private_key, hashes.SHA256(), default_backend())
 
-        if os.path.exists(cert_path):
-            with open(cert_path, 'rb') as cert_file:
-                certificate = x509.load_der_x509_certificate(
-                    data=cert_file.read(),
-                    backend=default_backend()
-                )
-        else:
-            certificate = x509.CertificateBuilder().subject_name(
-                subject
-            ).issuer_name(
-                subject
-            ).public_key(
-                private_key.public_key()
-            ).serial_number(
-                x509.random_serial_number()
-            ).not_valid_before(
-                datetime.datetime.utcnow()
-            ).not_valid_after(
-                datetime.datetime.utcnow() + datetime.timedelta(days=365)
-            ).add_extension(
-                x509.BasicConstraints(ca=True, path_length=None),
-                True
-            ).add_extension(
-                x509.KeyUsage(
-                    digital_signature=True,
-                    content_commitment=False,
-                    key_encipherment=True,
-                    data_encipherment=False,
-                    key_agreement=False,
-                    key_cert_sign=False,
-                    crl_sign=False,
-                    encipher_only=False,
-                    decipher_only=False
-                ),
-                True
-            ).sign(private_key, hashes.SHA256(), default_backend())
+        storage.ca_certificate = certificate
 
-        if os.path.exists(serial_path):
-            with open(serial_path, 'r') as fd:
-                line = fd.read()
-                if len(line) > 0:
-                    serial = int(line)
-                else:
-                    serial = 1
-        else:
-            serial = 1
-            with open(serial_path, 'w+') as fd:
-                fd.write(str(serial))
-
-        ca = cls(base_path, certificate, private_key, None, serial)
+        ca = cls(storage)
         return ca
 
-    def __init__(self, path: str, certificate: x509.Certificate, private_key: rsa.RSAPrivateKeyWithSerialization, password=None, serial=1):
+    def __init__(self, storage: CertificateAuthorityStorage):
         """
         Args:
-            path: Storage path
-            certificate: Instance of commandment.pki.models.Certificate with the BasicConstraints CA extension
-            private_key: Instance of commandment.pki.models.RSAPrivateKey
-            password: Private key password if required (Ignored currently)
-            
+            storage (CertificateAuthorityStorage): The storage backend to persist keys and certificates.
         """
-        self._path = path
-        self._certificate = certificate
-        self._private_key = private_key
-        self._serial = serial
-        self._persist_ca(self._certificate, self._private_key, password)
+        self._storage = storage
 
     @property
     def serial(self):
-        return self._serial
+        return self._storage.serial
 
     @serial.setter
     def serial(self, value: int):
-        self._serial = value
-        serial_path = os.path.join(self.path, 'private', 'serial.txt')
-        with open(serial_path, 'w+') as fd:
-            fd.write(str(self._serial))
-            
-    @property
-    def path(self):
-        return self._path
+        self._storage.serial = value
 
     @property
     def certificate(self) -> x509.Certificate:
         """Retrieve the CA Certificate"""
-        return self._certificate
+        return self._storage.ca_certificate
 
     @property
     def private_key(self) -> rsa.RSAPrivateKey:
         """Retrieve the CA Private Key"""
-        return self._private_key
-
-    def _persist_ca(self, certificate: x509.Certificate, private_key: rsa.RSAPrivateKeyWithSerialization, password=None):
-        """Persist the CA key pair to storage."""
-        with open(os.path.join(self._path, 'certs', 'ca.cer'), 'wb') as fd:
-            cert_bytes = certificate.public_bytes(serialization.Encoding.DER)
-            fd.write(cert_bytes)
-
-        with open(os.path.join(self._path, 'private', 'ca.key.pem'), 'wb') as fd:
-            if password:
-                enc = serialization.BestAvailableEncryption(password)
-            else:
-                enc = serialization.NoEncryption()
-
-            key_bytes = private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=enc
-            )
-            fd.write(key_bytes)
-
-    def _persist_issued(self, certificate: x509.Certificate):
-        """Persist an issued certificate to the ``newcerts`` directory."""
-        cert_path = os.path.join(self._path, 'newcerts', '{}.cer'.format(certificate.serial_number))
-        with open(cert_path, 'wb') as fd:
-            fd.write(certificate.public_bytes(serialization.Encoding.PEM))
+        return self._storage.private_key
 
     def signer_identifier(self) -> SignerIdentifier:
         """Get the identity of this CA instance as a SignerIdentifier structure for CMS."""
@@ -195,6 +124,7 @@ class CertificateAuthority(object):
         Returns:
             Instance of x509.Certificate
         """
+        serial = self.serial + 1
         builder = x509.CertificateBuilder()
         cert = builder.subject_name(
             csr.subject
@@ -203,31 +133,17 @@ class CertificateAuthority(object):
         ).not_valid_before(
             datetime.datetime.utcnow()
         ).not_valid_after(
-            datetime.datetime.utcnow() + datetime.timedelta(days=30)
+            datetime.datetime.utcnow() + datetime.timedelta(days=365)
         ).serial_number(
-            self.serial
+            serial
         ).public_key(
             csr.public_key()
         ).sign(self.private_key, hashes.SHA256(), default_backend())
 
-        self._persist_issued(cert)
-        self.serial = self.serial + 1
+        self._storage.save_issued_certificate(cert)
+        self.serial = serial
 
         return cert
-
-
-def ca_from_storage(path: str) -> CertificateAuthority:
-    """Create a new CertificateAuthority at the given path."""
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-    for d in STORAGE_DIRS:
-        abspath = os.path.join(path, d)
-        if not os.path.exists(abspath):
-            os.mkdir(abspath)
-
-    ca = CertificateAuthority.load_or_create(path)
-    return ca
 
 
 def get_ca() -> CertificateAuthority:

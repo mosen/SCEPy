@@ -1,6 +1,7 @@
 from flask import Flask, abort, request, Response, g
 import plistlib
-from .ca import CertificateAuthority, ca_from_storage, get_ca
+from .ca import CertificateAuthority
+from .storage import FileStorage
 from base64 import b64decode, b64encode
 from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography import x509
@@ -10,6 +11,8 @@ from .message import SCEPMessage
 from .enums import MessageType, PKIStatus, FailInfo
 from .builders import PKIMessageBuilder, Signer, create_degenerate_certificate
 from .envelope import PKCSPKIEnvelopeBuilder
+
+# from .admin import admin_app
 
 CACAPS = ('POSTPKIOperation', 'SHA-256', 'AES')
 
@@ -43,19 +46,24 @@ app = Flask(__name__)
 app.config.from_object('scepy.default_settings')
 app.config.from_envvar('SCEPY_SETTINGS', True)
 app.wsgi_app = WSGIChunkedBodyCopy(app.wsgi_app)
+# app.register_blueprint(admin_app)
 
 with app.app_context():
-    g.ca = ca_from_storage(app.config['CA_ROOT'])
+    storage = FileStorage(app.config['CA_ROOT'])
+    if storage.exists():
+        g.ca = CertificateAuthority(storage)
+    else:
+        g.ca = CertificateAuthority.create(storage)
 
 @app.route('/cgi-bin/pkiclient.exe', methods=['GET', 'POST'])
 @app.route('/scep', methods=['GET', 'POST'])
 @app.route('/', methods=['GET', 'POST'])
 def scep():
     op = request.args.get('operation')
-    mdm_ca = ca_from_storage(app.config['CA_ROOT'])
+    ca = g.ca
 
     if op == 'GetCACert':
-        certs = [mdm_ca.certificate]
+        certs = [ca.certificate]
 
         if len(certs) == 1 and not app.config.get('FORCE_DEGENERATE_FOR_SINGLE_CERT', False):
             return Response(certs[0].public_bytes(Encoding.DER), mimetype='application/x-x509-ca-cert')
@@ -85,8 +93,8 @@ def scep():
         if req.message_type == MessageType.PKCSReq:
             app.logger.debug('received PKCSReq SCEP message')
 
-            cakey = mdm_ca.private_key
-            cacert = mdm_ca.certificate
+            cakey = ca.private_key
+            cacert = ca.certificate
 
             der_req = req.get_decrypted_envelope_data(
                 cacert,
@@ -106,7 +114,7 @@ def scep():
                     break  # TODO: if challenge password fails send pkcs#7 with pki status failure
 
             # CA should persist all signed certs itself
-            new_cert = mdm_ca.sign(cert_req)
+            new_cert = ca.sign(cert_req)
             degenerate = create_degenerate_certificate(new_cert)
             with open('/tmp/degenerate.der', 'wb') as fd:
                 fd.write(degenerate.dump())
