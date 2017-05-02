@@ -15,9 +15,11 @@ setup(
     ],
     keywords='SCEP',
     install_requires=[
+        'asn1crypto>=0.22.0'
         'cryptography>=1.8.1',
         'Flask',
-        'oscrypto>=0.18.0'
+        'oscrypto>=0.18.0',
+        'requests>=2.13.0'
     ],
     python_requires='>=3.5',
     tests_require=[
