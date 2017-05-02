@@ -15,14 +15,23 @@ from asn1crypto.cms import ContentInfo
 
 parser = argparse.ArgumentParser()
 parser.add_argument('url', help='The SCEP server URL')
+parser.add_argument('operation', help='The operation to perform', default='pkcsreq', choices=['pkcsreq', 'getcert'])
+parser.add_argument('-v', '--verbose', action='count', default=0)
 parser.add_argument('-c', '--challenge', help='SCEP Challenge to send with the signing request')
 parser.add_argument('-k', '--private-key', help='PEM formatted RSA private key (will be generated if omitted)')
 parser.add_argument('-p', '--password', help='private key password (if required)')
-parser.add_argument('-d', '--debug', help='enable debug mode', action='store_const', dest='loglevel',
-                    const=logging.DEBUG, default=logging.WARNING)
-parser.add_argument('--dump-pkcsreq', help='dump PKCSReq.bin to path given')
+parser.add_argument('--dump-request', help='dump binary representation of PKCSReq to this location')
+parser.add_argument('--dump-response', help='dump binary representation of CertRep to this location')
 
 logger = logging.getLogger(__name__)
+
+LOG_LEVELS = [
+    logging.NOTSET,
+    logging.ERROR,
+    logging.WARNING,
+    logging.INFO,
+    logging.DEBUG
+]
 
 
 def getcacaps(url: str) -> Set[CACaps]:
@@ -52,15 +61,20 @@ def pkioperation(url: str, data: bytes):
 
 def main():
     args = parser.parse_args()
-    logging.basicConfig(level=args.loglevel)
+    if 0 < args.verbose < 4:
+        loglevel = LOG_LEVELS[args.verbose]
+    else:
+        loglevel = logging.ERROR
+
+    logging.basicConfig(level=loglevel)
 
     logger.info('Request: GetCACaps')
     cacaps = getcacaps(args.url)
-    logger.info(cacaps)
+    logger.debug(cacaps)
     logger.info('Request: GetCACert')
     cacert = getcacert(args.url)
-    logger.info('CA Certificate Subject Follows')
-    logger.info(cacert.subject)
+    logger.debug('CA Certificate Subject Follows')
+    logger.debug(cacert.subject)
 
     private_key = None
     if args.private_key:
@@ -68,15 +82,19 @@ def main():
             data = fd.read()
             private_key = serialization.load_pem_private_key(data, backend=default_backend(), password=None)
 
+        logger.debug('Successfully read private key from filesystem')
+
     private_key, csr = generate_csr(private_key)
-    logger.info('Writing RSA private key to ./scep.key')
-    pem = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-    with open('scep.key', 'wb') as fd:
-        fd.write(pem)
+
+    if not args.private_key:
+        logger.debug('Writing RSA private key to ./scep.key')
+        pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        with open('scep.key', 'wb') as fd:
+            fd.write(pem)
 
     ssc = generate_self_signed(private_key, csr.subject)
 
@@ -96,23 +114,22 @@ def main():
 
     pki_msg = pki_msg_builder.finalize()
 
-    if args.dump_pkcsreq:
+    if args.dump_request:
         with open(args.dump_pkcsreq, 'wb') as fd:
             fd.write(pki_msg.dump())
-        logger.info('Dumped PKCSReq data to {}'.format(args.dump_pkcsreq))
+        logger.debug('Dumped PKCSReq data to {}'.format(args.dump_pkcsreq))
 
     res = pkioperation(args.url, data=pki_msg.dump())
 
-    logger.info('Response: Status {}'.format(res.status_code))
+    logger.debug('Response: Status {}'.format(res.status_code))
     if res.status_code != 200:
         return -1
 
-    cinfo = ContentInfo.load(res.content)
-    cinfo.debug()
     cert_rep = SCEPMessage.parse(res.content)
-    with open('certrep.der', 'wb') as fd:
-        fd.write(res.content)
-    logger.info('Dumped CertRep')
+    if args.dump_response:
+        with open(args.dump_response, 'wb') as fd:
+            fd.write(res.content)
+        logger.debug('Dumped CertRep data to {}'.format(args.dump_response))
 
     logger.debug('pkiMessage response follows')
     logger.debug('Transaction ID: %s', cert_rep.transaction_id)
