@@ -50,16 +50,17 @@ app.wsgi_app = WSGIChunkedBodyCopy(app.wsgi_app)
 
 with app.app_context():
     storage = FileStorage(app.config['CA_ROOT'])
-    if storage.exists():
-        g.ca = CertificateAuthority(storage)
-    else:
-        g.ca = CertificateAuthority.create(storage)
+
 
 @app.route('/cgi-bin/pkiclient.exe', methods=['GET', 'POST'])
 @app.route('/scep', methods=['GET', 'POST'])
 @app.route('/', methods=['GET', 'POST'])
 def scep():
     op = request.args.get('operation')
+    if storage.exists():
+        g.ca = CertificateAuthority(storage)
+    else:
+        g.ca = CertificateAuthority.create(storage)
     ca = g.ca
 
     if op == 'GetCACert':

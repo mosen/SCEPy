@@ -44,7 +44,7 @@ class FileStorage(CertificateAuthorityStorage):
         with open(self._cert_path, 'rb') as fd:
             pem_data = fd.read()
 
-        certificate = x509.load_der_x509_certificate(
+        certificate = x509.load_pem_x509_certificate(
             data=pem_data,
             backend=default_backend()
         )

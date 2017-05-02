@@ -59,34 +59,27 @@ def pkioperation(url: str, data: bytes):
     return res
 
 
-def main():
-    args = parser.parse_args()
-    if 0 < args.verbose < 4:
-        loglevel = LOG_LEVELS[args.verbose]
-    else:
-        loglevel = logging.ERROR
-
-    logging.basicConfig(level=loglevel)
+def pkcsreq(url: str, private_key_path: str = None):
+    """Perform a PKCSReq operation by submitting a CSR to the SCEP service."""
 
     logger.info('Request: GetCACaps')
-    cacaps = getcacaps(args.url)
+    cacaps = getcacaps(url)
     logger.debug(cacaps)
     logger.info('Request: GetCACert')
-    cacert = getcacert(args.url)
+    cacert = getcacert(url)
     logger.debug('CA Certificate Subject Follows')
     logger.debug(cacert.subject)
 
-    private_key = None
-    if args.private_key:
-        with open(args.private_key, 'rb') as fd:
+    if private_key_path:
+        with open(private_key_path, 'rb') as fd:
             data = fd.read()
             private_key = serialization.load_pem_private_key(data, backend=default_backend(), password=None)
 
         logger.debug('Successfully read private key from filesystem')
+        private_key, csr = generate_csr(private_key)
+    else:
+        private_key, csr = generate_csr()
 
-    private_key, csr = generate_csr(private_key)
-
-    if not args.private_key:
         logger.debug('Writing RSA private key to ./scep.key')
         pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
@@ -114,22 +107,22 @@ def main():
 
     pki_msg = pki_msg_builder.finalize()
 
-    if args.dump_request:
-        with open(args.dump_pkcsreq, 'wb') as fd:
-            fd.write(pki_msg.dump())
-        logger.debug('Dumped PKCSReq data to {}'.format(args.dump_pkcsreq))
+    # if args.dump_request:
+    #     with open(args.dump_pkcsreq, 'wb') as fd:
+    #         fd.write(pki_msg.dump())
+    #     logger.debug('Dumped PKCSReq data to {}'.format(args.dump_pkcsreq))
 
-    res = pkioperation(args.url, data=pki_msg.dump())
+    res = pkioperation(url, data=pki_msg.dump())
 
     logger.debug('Response: Status {}'.format(res.status_code))
     if res.status_code != 200:
         return -1
 
     cert_rep = SCEPMessage.parse(res.content)
-    if args.dump_response:
-        with open(args.dump_response, 'wb') as fd:
-            fd.write(res.content)
-        logger.debug('Dumped CertRep data to {}'.format(args.dump_response))
+    # if args.dump_response:
+    #     with open(args.dump_response, 'wb') as fd:
+    #         fd.write(res.content)
+    #     logger.debug('Dumped CertRep data to {}'.format(args.dump_response))
 
     logger.debug('pkiMessage response follows')
     logger.debug('Transaction ID: %s', cert_rep.transaction_id)
@@ -144,11 +137,32 @@ def main():
     signed_response = degenerate_info['content']
     certs = signed_response['certificates']
 
-    certs.debug()
-
     my_cert = certs[0].chosen
+
     result = x509.load_der_x509_certificate(my_cert.dump(), default_backend())
-    print(result.subject)
+    subject = result.subject
+
+    logger.info('SCEP CA issued a certificate with serial #{}, subject: {}'.format(result.serial_number, subject))
+
+    pem_data = result.public_bytes(serialization.Encoding.PEM)
+    with open('scep.cer', 'wb') as fd:
+        fd.write(pem_data)
+
+
+def main():
+    args = parser.parse_args()
+    if 0 < args.verbose < 4:
+        loglevel = LOG_LEVELS[args.verbose]
+    else:
+        loglevel = logging.ERROR
+
+    logging.basicConfig(level=loglevel)
+
+    if args.operation == 'pkcsreq':
+        pkcsreq(args.url)
+    elif args.operation == 'getcert':
+        pass
+    
 
 
 
