@@ -51,9 +51,10 @@ def generate_self_signed(private_key: rsa.RSAPrivateKey, subject: x509.Name) -> 
     builder = builder.subject_name(subject)
     builder = builder.issuer_name(subject)
     builder = builder.not_valid_before(datetime.datetime.today() - one_day)
-    builder = builder.not_valid_after(datetime.datetime(2018, 1, 1))
+    builder = builder.not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
     builder = builder.serial_number(x509.random_serial_number())
     builder = builder.public_key(private_key.public_key())
+    
     # builder = builder.add_extension(
     #     x509.KeyUsage(digital_signature=True, key_encipherment=True), critical=True
     # )
