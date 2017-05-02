@@ -139,7 +139,6 @@ class CertificateAuthority(object):
         with open(serial_path, 'w+') as fd:
             fd.write(str(self._serial))
             
-
     @property
     def path(self):
         return self._path
