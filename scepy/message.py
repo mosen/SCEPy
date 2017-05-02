@@ -81,20 +81,19 @@ class SCEPMessage(object):
             content_digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
             content_digest.update(signed_data['encap_content_info']['content'].native)
             content_digest_r = content_digest.finalize()
-            print('expecting SHA-256 digest: {}'.format(b64encode(content_digest_r)))
+            # print('expecting SHA-256 digest: {}'.format(b64encode(content_digest_r)))
             for attr in signer_info['signed_attrs']:
                 if attr['type'].native == 'message_digest':
-                    print('signer says digest is: {}'.format(b64encode(attr['values'][0].native)))
+                    pass
+                    # print('signer says digest is: {}'.format(b64encode(attr['values'][0].native)))
 
             # Calculate Digest on content + signed attrs
             cdsa = hashes.Hash(hashes.SHA256(), backend=default_backend())
             #cdsa.update(signed_data['encap_content_info']['content'].native)
             cdsa.update(signer_info['signed_attrs'].dump())
             cdsa_r = cdsa.finalize()
-            print('signature digest: {}'.format(b64encode(cdsa_r)))
-
-
-            print('expecting signature: {}'.format(b64encode(signer_info['signature'].native)))
+            # print('signature digest: {}'.format(b64encode(cdsa_r)))
+            # print('expecting signature: {}'.format(b64encode(signer_info['signature'].native)))
             # verifier.verify()
 
             # Set the signer for convenience on the instance
@@ -114,6 +113,8 @@ class SCEPMessage(object):
                         msg._recipient_nonce = signed_attr['values'][0].native
                     elif name == 'pki_status':
                         msg._pki_status = signed_attr['values'][0].native
+                    elif name == 'fail_info':
+                        msg._fail_info = signed_attr['values'][0].native
             
         msg._signed_data = cinfo['content']['encap_content_info']['content']
 
@@ -154,6 +155,10 @@ class SCEPMessage(object):
     @property
     def pki_status(self):
         return self._pki_status
+
+    @property
+    def fail_info(self):
+        return self._fail_info
 
     @property
     def signer(self):

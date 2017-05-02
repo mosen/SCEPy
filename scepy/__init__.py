@@ -118,6 +118,8 @@ def scep():
                         assert len(attr['values']) == 1
                         challenge_password = attr['values'][0].native
                         if challenge_password != app.config['SCEP_CHALLENGE']:
+                            app.logger.warning('Client did not send the correct challenge')
+
                             signer = Signer(cacert, cakey)
                             reply = PKIMessageBuilder().message_type(
                                 MessageType.CertRep
@@ -130,7 +132,23 @@ def scep():
                             ).add_signer(signer).finalize()
 
                             return Response(reply.dump(), mimetype='application/x-pki-message')
-                        break
+                        else:
+                            break
+
+                    app.logger.warning('Client did not send any challenge password, but there was one configured')
+                    signer = Signer(cacert, cakey)
+                    reply = PKIMessageBuilder().message_type(
+                        MessageType.CertRep
+                    ).transaction_id(
+                        req.transaction_id
+                    ).pki_status(
+                        PKIStatus.FAILURE, FailInfo.BadRequest
+                    ).recipient_nonce(
+                        req.sender_nonce
+                    ).add_signer(signer).finalize()
+
+                    return Response(reply.dump(), mimetype='application/x-pki-message')
+
 
             # CA should persist all signed certs itself
             new_cert = ca.sign(cert_req)

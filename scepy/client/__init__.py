@@ -25,14 +25,6 @@ parser.add_argument('--dump-response', help='dump binary representation of CertR
 
 logger = logging.getLogger(__name__)
 
-LOG_LEVELS = [
-    logging.NOTSET,
-    logging.ERROR,
-    logging.WARNING,
-    logging.INFO,
-    logging.DEBUG
-]
-
 
 def getcacaps(url: str) -> Set[CACaps]:
     """Query the SCEP Service for its capabilities."""
@@ -128,35 +120,34 @@ def pkcsreq(url: str, private_key_path: str = None):
     logger.debug('Transaction ID: %s', cert_rep.transaction_id)
     logger.debug('PKI Status: %s', PKIStatus(cert_rep.pki_status))
 
-    # This should be the PKCS#7 Degenerate
-    decrypted_bytes = cert_rep.get_decrypted_envelope_data(ssc, private_key)
-    degenerate_info = ContentInfo.load(decrypted_bytes)
-    # degenerate_info.debug()
+    if PKIStatus(cert_rep.pki_status) == PKIStatus.FAILURE:
+        logger.error('SCEP Request Failed: {}'.format(FailInfo(cert_rep.fail_info)))
 
-    assert degenerate_info['content_type'].native == 'signed_data'
-    signed_response = degenerate_info['content']
-    certs = signed_response['certificates']
+    elif PKIStatus(cert_rep.pki_status) == PKIStatus.SUCCESS:
+        # This should be the PKCS#7 Degenerate
+        decrypted_bytes = cert_rep.get_decrypted_envelope_data(ssc, private_key)
+        degenerate_info = ContentInfo.load(decrypted_bytes)
+        # degenerate_info.debug()
 
-    my_cert = certs[0].chosen
+        assert degenerate_info['content_type'].native == 'signed_data'
+        signed_response = degenerate_info['content']
+        certs = signed_response['certificates']
 
-    result = x509.load_der_x509_certificate(my_cert.dump(), default_backend())
-    subject = result.subject
+        my_cert = certs[0].chosen
 
-    logger.info('SCEP CA issued a certificate with serial #{}, subject: {}'.format(result.serial_number, subject))
+        result = x509.load_der_x509_certificate(my_cert.dump(), default_backend())
+        subject = result.subject
 
-    pem_data = result.public_bytes(serialization.Encoding.PEM)
-    with open('scep.cer', 'wb') as fd:
-        fd.write(pem_data)
+        logger.info('SCEP CA issued a certificate with serial #{}, subject: {}'.format(result.serial_number, subject))
+
+        pem_data = result.public_bytes(serialization.Encoding.PEM)
+        with open('scep.cer', 'wb') as fd:
+            fd.write(pem_data)
 
 
 def main():
     args = parser.parse_args()
-    if 0 < args.verbose < 4:
-        loglevel = LOG_LEVELS[args.verbose]
-    else:
-        loglevel = logging.ERROR
-
-    logging.basicConfig(level=loglevel)
+    logging.basicConfig(level=logging.DEBUG)
 
     if args.operation == 'pkcsreq':
         pkcsreq(args.url)
