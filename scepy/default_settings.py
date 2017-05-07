@@ -16,7 +16,7 @@ SAN_DNSNAME = 'scepy.dev'
 PORT = 5000
 
 # (Optional) SCEP static challenge
-SCEP_CHALLENGE = 'sekret'
+# SCEP_CHALLENGE = 'sekret'
 
 
 FORCE_DEGENERATE_FOR_SINGLE_CERT = False
