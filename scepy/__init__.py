@@ -14,7 +14,7 @@ from .envelope import PKCSPKIEnvelopeBuilder
 
 # from .admin import admin_app
 
-CACAPS = ('POSTPKIOperation', 'SHA-256', 'AES')
+CACAPS = ('POSTPKIOperation', 'SHA-256', 'AES', 'Renewal')
 
 
 class WSGIChunkedBodyCopy(object):
@@ -96,8 +96,8 @@ def scep():
         app.logger.debug('Received SCEPMessage, details follow')
         req.debug()
 
-        if req.message_type == MessageType.PKCSReq:
-            app.logger.debug('received PKCSReq SCEP message')
+        if req.message_type == MessageType.PKCSReq or req.message_type == MessageType.RenewalReq:
+            app.logger.debug('received {} SCEP message'.format(MessageType(req.message_type)))
 
             cakey = ca.private_key
             cacert = ca.certificate
@@ -110,8 +110,8 @@ def scep():
             cert_req = x509.load_der_x509_csr(der_req, backend=default_backend())
             req_info_bytes = cert_req.tbs_certrequest_bytes
 
-            # Check the challenge password
-            if 'SCEP_CHALLENGE' in app.config:
+            # Check the challenge password (unless it is a renewal)
+            if 'SCEP_CHALLENGE' in app.config and req.message_type == MessageType.PKCSReq:
                 req_info = CertificationRequestInfo.load(req_info_bytes)
                 for attr in req_info['attributes']:
                     if attr['type'].native == 'challenge_password':
@@ -136,6 +136,7 @@ def scep():
                             break
 
                     app.logger.warning('Client did not send any challenge password, but there was one configured')
+
                     signer = Signer(cacert, cakey)
                     reply = PKIMessageBuilder().message_type(
                         MessageType.CertRep
