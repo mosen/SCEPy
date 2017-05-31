@@ -14,7 +14,7 @@ from .envelope import PKCSPKIEnvelopeBuilder
 
 # from .admin import admin_app
 
-CACAPS = ('POSTPKIOperation', 'SHA-256', 'AES', 'Renewal')
+CACAPS = ('POSTPKIOperation', 'SHA-256', 'AES', 'SHA-512', 'Renewal')
 
 
 class WSGIChunkedBodyCopy(object):

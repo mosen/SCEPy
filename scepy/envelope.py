@@ -6,13 +6,20 @@ from asn1crypto.core import OctetString
 from cryptography.hazmat.primitives.asymmetric import padding as asympad
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import modes, Cipher
-from cryptography.hazmat.primitives.ciphers.algorithms import TripleDES
+from cryptography.hazmat.primitives.ciphers.algorithms import TripleDES, AES
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives import serialization, hashes
 from oscrypto.keys import parse_certificate
-from typing import Tuple
+from typing import Tuple, Union
 from asn1crypto.algos import EncryptionAlgorithmId, EncryptionAlgorithm
 from cryptography import x509
+from enum import Enum
+
+
+class EncryptionCipher(Enum):
+    AES = 'aes'
+    TRIPLEDES = 'tripledes_3key'
+
 
 
 class PKCSPKIEnvelopeBuilder(object):
