@@ -222,6 +222,9 @@ class SCEPMessage(object):
         else:
             print('Dont understand encryption cipher: ', algorithm.encryption_cipher)
 
+        print('key length: ', algorithm.key_length)
+        print('enc mode: ', algorithm.encryption_mode)
+
         cipher = Cipher(symkey, modes.CBC(algorithm.encryption_iv), backend=default_backend())
         decryptor = cipher.decryptor()
 

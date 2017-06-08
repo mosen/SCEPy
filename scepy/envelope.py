@@ -45,7 +45,12 @@ class PKCSPKIEnvelopeBuilder(object):
               PKCSPKIEnvelopeBuilder
         """
         self._data = data
-        self._encryption_algorithm_id = EncryptionAlgorithmId('tripledes_3key')
+        if algorithm == '3des':
+            self._encryption_algorithm_id = EncryptionAlgorithmId('tripledes_3key')
+        elif algorithm == 'aes':
+            self._encryption_algorithm_id = EncryptionAlgorithmId('aes128_cbc')
+        else:
+            raise ValueError('Unrecognised encryption algorithm ', algorithm)
 
         return self
 
@@ -61,7 +66,7 @@ class PKCSPKIEnvelopeBuilder(object):
 
         return self
 
-    def _encrypt_data(self, data: bytes) -> Tuple[TripleDES, bytes, bytes]:
+    def _encrypt_data(self, data: bytes) -> Tuple[Union[TripleDES, AES], bytes, bytes]:
         """Build the ciphertext of the ``messageData``.
 
         Args:
@@ -70,18 +75,30 @@ class PKCSPKIEnvelopeBuilder(object):
         Returns:
               Tuple of 3DES key, IV, and cipher text encrypted with 3DES
         """
-        des_key = TripleDES(os.urandom(24))
-        iv = os.urandom(8)
-        cipher = Cipher(des_key, modes.CBC(iv), backend=default_backend())
+        symkey, iv = None, None
+
+        # TODO: this is horribad and needs abstraction
+        if self._encryption_algorithm_id.native == 'tripledes_3key':
+            symkey = TripleDES(os.urandom(8))
+            iv = os.urandom(8)
+        elif self._encryption_algorithm_id.native == 'aes128_cbc':
+            symkey = AES(os.urandom(16))
+            iv = os.urandom(16)
+
+        cipher = Cipher(symkey, modes.CBC(iv), backend=default_backend())
         encryptor = cipher.encryptor()
 
-        padder = PKCS7(TripleDES.block_size).padder()
+        if self._encryption_algorithm_id.native == 'tripledes_3key':
+            padder = PKCS7(TripleDES.block_size).padder()
+        elif self._encryption_algorithm_id.native == 'aes128_cbc':
+            padder = PKCS7(AES.block_size).padder()
+
         padded = padder.update(data)
         padded += padder.finalize()
 
         ciphertext = encryptor.update(padded) + encryptor.finalize()
 
-        return des_key, iv, ciphertext
+        return symkey, iv, ciphertext
 
     def _build_recipient_info(self, symmetric_key: bytes, recipient: x509.Certificate) -> RecipientInfo:
         """Build an ASN.1 data structure containing the encrypted symmetric key for the encrypted_content.
@@ -115,25 +132,25 @@ class PKCSPKIEnvelopeBuilder(object):
 
         return ri
 
-    def finalize(self) -> Tuple[EnvelopedData, TripleDES, bytes]:
+    def finalize(self) -> Tuple[EnvelopedData, Union[TripleDES, AES], bytes]:
         """Encrypt the data and process the key using all available recipients.
         
         Returns:
               EnvelopedData, TripleDES, iv (bytes): The PKCSPKIEnvelope structure, The symmetric key, and the IV for
               the symmetric key.
         """
-        des_key, iv, ciphertext = self._encrypt_data(self._data)
+        sym_key, iv, ciphertext = self._encrypt_data(self._data)
 
         eci = EncryptedContentInfo({
             'content_type': ContentType('data'),
             'content_encryption_algorithm': EncryptionAlgorithm({
-                'algorithm': EncryptionAlgorithmId('tripledes_3key'),
+                'algorithm': self._encryption_algorithm_id,
                 'parameters': OctetString(iv),
             }),
             'encrypted_content': ciphertext,
         })
 
-        recipients = [self._build_recipient_info(des_key.key, recipient) for recipient in self._recipients]
+        recipients = [self._build_recipient_info(sym_key.key, recipient) for recipient in self._recipients]
         recipient_infos = RecipientInfos(recipients)
 
         ed = EnvelopedData({
@@ -142,4 +159,4 @@ class PKCSPKIEnvelopeBuilder(object):
             'encrypted_content_info': eci,
         })
 
-        return ed, des_key, iv
+        return ed, sym_key, iv

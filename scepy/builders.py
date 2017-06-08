@@ -78,20 +78,25 @@ class Signer(object):
           certificate (x509.Certificate): Signers certificate
           private_key (rsa.RSAPrivateKey): Signers private key
     """
-
-    digest_algorithm_id = DigestAlgorithmId('sha1')
-    # digest_algorithm_id = DigestAlgorithmId('sha256')
-    digest_algorithm = DigestAlgorithm({'algorithm': digest_algorithm_id})
     signed_digest_algorithm_id = SignedDigestAlgorithmId('rsassa_pkcs1v15')  # was: sha256_rsa
     signed_digest_algorithm = SignedDigestAlgorithm({'algorithm': signed_digest_algorithm_id, 'parameters': None})
 
     def __init__(self,
                  certificate: x509.Certificate,
                  private_key: rsa.RSAPrivateKeyWithSerialization,
+                 digest_algorithm: str,
                  signed_attributes: List[CMSAttribute] = None):
 
         self.certificate = certificate
         self.private_key = private_key
+
+        self.digest_algorithm_id = {
+            'sha1': DigestAlgorithmId('sha1'),
+            'sha256': DigestAlgorithmId('sha256'),
+            'sha512': DigestAlgorithmId('sha512'),
+        }[digest_algorithm]
+        self.digest_algorithm = DigestAlgorithm({'algorithm': self.digest_algorithm_id})
+
         if signed_attributes is not None:
             self.signed_attributes = signed_attributes
         else:
@@ -163,10 +168,15 @@ class Signer(object):
         # })
 
         # Get the RSA key to sign the digestinfo
+        digest_function = {
+            'sha1': hashes.SHA1,  # macOS
+            'sha256': hashes.SHA256,
+            'sha512': hashes.SHA512
+        }[self.digest_algorithm_id.native]
+
         signer = self.private_key.signer(
             asympad.PKCS1v15(),
-            hashes.SHA1()
-            #hashes.SHA256()
+            digest_function(),
         )
 
         # NOTE: this is not the digest `d` above because crypto.io already hashes stuff for us!!
@@ -420,7 +430,8 @@ class PKIMessageBuilder(object):
 
         # Calculate digest on encrypted content + signed_attrs
         #digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-        digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
+        digest = hashes.Hash(hashes.SHA512(), backend=default_backend())
+        #digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
         # digest.update(pkcs_pki_envelope.dump())
         digest.update(pkienvelope_content_info.dump())
         d = digest.finalize()
@@ -433,7 +444,11 @@ class PKIMessageBuilder(object):
         certificates = self._certificates
 
         #da_id = DigestAlgorithmId('sha256')
-        da_id = DigestAlgorithmId('sha1')
+
+        # SHA-1 works for macOS
+
+        # da_id = DigestAlgorithmId('sha1')
+        da_id = DigestAlgorithmId('sha512')
         da = DigestAlgorithm({'algorithm': da_id})
         das = DigestAlgorithms([da])
 

@@ -14,7 +14,7 @@ from .envelope import PKCSPKIEnvelopeBuilder
 
 # from .admin import admin_app
 
-CACAPS = ('POSTPKIOperation', 'SHA-256', 'AES', 'SHA-512', 'Renewal')
+CACAPS = ('POSTPKIOperation', 'SHA-1', 'SHA-256', 'AES', 'DES3', 'SHA-512', 'Renewal')
 
 
 class WSGIChunkedBodyCopy(object):
@@ -157,9 +157,9 @@ def scep():
             # with open('/tmp/degenerate.der', 'wb') as fd:
             #     fd.write(degenerate.dump())
 
-            envelope, _, _ = PKCSPKIEnvelopeBuilder().encrypt(degenerate.dump()).add_recipient(
+            envelope, _, _ = PKCSPKIEnvelopeBuilder().encrypt(degenerate.dump(), 'aes').add_recipient(
                 req.certificates[0]).finalize()
-            signer = Signer(cacert, cakey)
+            signer = Signer(cacert, cakey, 'sha512')
 
             reply = PKIMessageBuilder().message_type(
                 MessageType.CertRep
