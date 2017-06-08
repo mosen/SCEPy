@@ -6,7 +6,7 @@ from . import asn1
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding as asympad
-from cryptography.hazmat.primitives.ciphers.algorithms import TripleDES
+from cryptography.hazmat.primitives.ciphers.algorithms import TripleDES, AES
 from cryptography.hazmat.primitives.ciphers import Cipher, modes
 from cryptography.hazmat.backends import default_backend
 from .enums import MessageType
@@ -211,8 +211,18 @@ class SCEPMessage(object):
         algorithm = encrypted_contentinfo['content_encryption_algorithm']  #: EncryptionAlgorithm
         encrypted_content_bytes = encrypted_contentinfo['encrypted_content'].native
 
-        des_key = TripleDES(plain_key)
-        cipher = Cipher(des_key, modes.CBC(algorithm.encryption_iv), backend=default_backend())
+        symkey = None
+
+        if algorithm.encryption_cipher == 'aes':
+            symkey = AES(plain_key)
+            print('cipher AES')
+        elif algorithm.encryption_cipher == 'tripledes':
+            symkey = TripleDES(plain_key)
+            print('cipher 3DES')
+        else:
+            print('Dont understand encryption cipher: ', algorithm.encryption_cipher)
+
+        cipher = Cipher(symkey, modes.CBC(algorithm.encryption_iv), backend=default_backend())
         decryptor = cipher.decryptor()
 
         return decryptor.update(encrypted_content_bytes) + decryptor.finalize()
