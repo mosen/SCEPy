@@ -196,6 +196,7 @@ def mobileconfig():
     profile = {
         'PayloadType': 'Configuration',
         'PayloadDisplayName': 'SCEPy Enrolment Profile',
+        'PayloadDescription': 'This profile will enroll your device with the SCEP server',
         'PayloadVersion': 1,
         'PayloadIdentifier': 'com.github.mosen.scepy',
         'PayloadUUID': '7F165A7B-FACE-4A6E-8B56-CA3CC2E9D0BF',
@@ -206,9 +207,12 @@ def mobileconfig():
                 'PayloadIdentifier': 'com.github.mosen.scepy.scep',
                 'PayloadUUID': '16D129CA-DA22-4749-82D5-A28201622555',
                 'PayloadDisplayName': 'SCEPy Enrolment Payload',
+                'PayloadDescription': 'SCEPy Enrolment Payload',
                 'PayloadContent': {
                     'URL': my_url,
-                    'Name': 'SCEPY-CA'
+                    'Name': 'SCEPY-CA',
+                    'Keysize': 2048,
+                    'Key Usage': 5
                 }
             }
         ]
