@@ -1,4 +1,7 @@
 FROM tiangolo/uwsgi-nginx-flask:flask-python3.5
-COPY ./scepy /app/scepy
+COPY . /app
 COPY ./.docker/uwsgi.ini /app/uwsgi.ini
+RUN pip install -r /app/requirements.txt
+# RUN python /app/setup.py install
+
 
