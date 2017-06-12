@@ -14,3 +14,7 @@ Getting Started
     $ export SCEPY_SETTINGS=../scepy.cfg
     $ flask run
 
+macOS
+-----
+
+You can visit ``/mobileconfig`` to download a SCEP profile which will enroll you with the service.
