@@ -21,7 +21,6 @@ class EncryptionCipher(Enum):
     TRIPLEDES = 'tripledes_3key'
 
 
-
 class PKCSPKIEnvelopeBuilder(object):
     """Build a PKCSPKIEnvelope (envelopedData + encryptedContentInfo) as per SCEP RFC
     
@@ -47,8 +46,10 @@ class PKCSPKIEnvelopeBuilder(object):
         self._data = data
         if algorithm == '3des':
             self._encryption_algorithm_id = EncryptionAlgorithmId('tripledes_3key')
-        elif algorithm == 'aes':
+        elif algorithm == 'aes128':
             self._encryption_algorithm_id = EncryptionAlgorithmId('aes128_cbc')
+        elif algorithm == 'aes256':
+            self._encryption_algorithm_id = EncryptionAlgorithmId('aes256_cbc')
         else:
             raise ValueError('Unrecognised encryption algorithm ', algorithm)
 
@@ -84,6 +85,9 @@ class PKCSPKIEnvelopeBuilder(object):
         elif self._encryption_algorithm_id.native == 'aes128_cbc':
             symkey = AES(os.urandom(16))
             iv = os.urandom(16)
+        elif self._encryption_algorithm_id.native == 'aes256_cbc':
+            symkey = AES(os.urandom(32))
+            iv = os.urandom(16)
 
         cipher = Cipher(symkey, modes.CBC(iv), backend=default_backend())
         encryptor = cipher.encryptor()
@@ -91,6 +95,8 @@ class PKCSPKIEnvelopeBuilder(object):
         if self._encryption_algorithm_id.native == 'tripledes_3key':
             padder = PKCS7(TripleDES.block_size).padder()
         elif self._encryption_algorithm_id.native == 'aes128_cbc':
+            padder = PKCS7(AES.block_size).padder()
+        elif self._encryption_algorithm_id.native == 'aes256_cbc':
             padder = PKCS7(AES.block_size).padder()
 
         padded = padder.update(data)

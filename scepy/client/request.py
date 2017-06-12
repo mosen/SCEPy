@@ -31,7 +31,7 @@ def generate_csr(private_key: rsa.RSAPrivateKey = None) -> Tuple[rsa.RSAPrivateK
         x509.BasicConstraints(ca=False, path_length=None), critical=True
     )
     csr = builder.sign(
-        private_key, hashes.SHA256(), default_backend()
+        private_key, hashes.SHA512(), default_backend() # Was: SHA-256
     )
     return private_key, csr
 
@@ -58,7 +58,7 @@ def generate_self_signed(private_key: rsa.RSAPrivateKey, subject: x509.Name) -> 
     # builder = builder.add_extension(
     #     x509.KeyUsage(digital_signature=True, key_encipherment=True), critical=True
     # )
-    certificate = builder.sign(private_key=private_key, algorithm=hashes.SHA256(),
+    certificate = builder.sign(private_key=private_key, algorithm=hashes.SHA512(),  # Was: SHA-256
                                backend=default_backend())
     return certificate
 

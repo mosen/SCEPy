@@ -75,7 +75,7 @@ class CertificateAuthority(object):
                 decipher_only=False
             ),
             True
-        ).sign(private_key, hashes.SHA256(), default_backend())
+        ).sign(private_key, hashes.SHA512(), default_backend())  # Was: SHA-256 for macOS
 
         storage.ca_certificate = certificate
 
@@ -116,7 +116,7 @@ class CertificateAuthority(object):
 
         return sid
 
-    def sign(self, csr: x509.CertificateSigningRequest) -> x509.Certificate:
+    def sign(self, csr: x509.CertificateSigningRequest, algorithm: str = 'sha256') -> x509.Certificate:
         """Sign a certificate signing request.
 
         Args:
@@ -126,6 +126,13 @@ class CertificateAuthority(object):
         """
         serial = self.serial + 1
         builder = x509.CertificateBuilder()
+
+        hash_functions = {
+            'sha1': hashes.SHA1,
+            'sha256': hashes.SHA256,
+            'sha512': hashes.SHA512,
+        }
+
         cert = builder.subject_name(
             csr.subject
         ).issuer_name(
@@ -138,7 +145,7 @@ class CertificateAuthority(object):
             serial
         ).public_key(
             csr.public_key()
-        ).sign(self.private_key, hashes.SHA256(), default_backend())
+        ).sign(self.private_key, hash_functions.get(algorithm, hashes.SHA256)(), default_backend())
 
         self._storage.save_issued_certificate(cert)
         self.serial = serial
