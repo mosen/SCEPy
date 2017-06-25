@@ -40,8 +40,10 @@ def getcacert(url: str) -> x509.Certificate:
     """Query the SCEP Service for the CA Certificate."""
     res = requests.get(url, {'operation': 'GetCACert'})
     assert res.status_code == 200
-    assert res.headers['content-type'] == 'application/x-x509-ca-cert'  # we dont support RA cert yet
-    return x509.load_der_x509_certificate(res.content, default_backend())
+    if res.headers['content-type'] == 'application/x-x509-ca-cert':  # we dont support RA cert yet
+        return x509.load_der_x509_certificate(res.content, default_backend())
+    elif res.headers['content-type'] == 'application/x-x509-ca-ra-cert':  # intermediate via chain
+        pass # decode cms
 
 
 def pkioperation(url: str, data: bytes):
