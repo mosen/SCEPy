@@ -29,11 +29,14 @@ class SCEPMessage(object):
         signed_data = cinfo['content']
 
         # convert certificates using cryptography lib since it is easier to deal with the decryption
-        assert len(signed_data['certificates']) > 0
-        certs = certificates_from_asn1(signed_data['certificates'])
-        print('{} certificate(s) attached to signedData'.format(len(certs)))
-        msg._certificates = certs
-        
+        if len(signed_data['certificates']) > 0:
+            certs = certificates_from_asn1(signed_data['certificates'])
+            print('{} certificate(s) attached to signedData'.format(len(certs)))
+            msg._certificates = certs
+        else:
+            certs = []
+            print('No certificate(s) attached to signedData')
+
         # Iterate through signers and verify the signature for each.
         # Set convenience attributes at the same time
         for signer_info in cinfo['content']['signer_infos']:
@@ -43,12 +46,14 @@ class SCEPMessage(object):
             assert isinstance(identifier, IssuerAndSerialNumber)  # TODO: also support other signer ids
 
             signer_cert = None
-            for c in certs:  # find signer cert
-                if c.serial_number == identifier['serial_number'].native:  # TODO: also convert issuer
-                    signer_cert = c
-                    break
+            if len(certs) > 0:
+                for c in certs:  # find signer cert
+                    if c.serial_number == identifier['serial_number'].native:  # TODO: also convert issuer
+                        signer_cert = c
+                        break
 
-            assert signer_cert is not None
+            # can be none if response is failure
+            # assert signer_cert is not None
 
             sig_algo = signer_info['signature_algorithm'].signature_algo
             print('Using signature algorithm: {}'.format(sig_algo))
@@ -65,36 +70,37 @@ class SCEPMessage(object):
                 raise ValueError('Unsupported hash algorithm: {}'.format(hash_algo))
 
             assert sig_algo == 'rsassa_pkcs1v15'  # We only support PKCS1v1.5
-            verifier = signer_cert.public_key().verifier(
-                signer_info['signature'].native,
-                asympad.PKCS1v15(),
-                hasher
-            )
+            if len(certs) > 0:  # verify content
+                verifier = signer_cert.public_key().verifier(
+                    signer_info['signature'].native,
+                    asympad.PKCS1v15(),
+                    hasher
+                )
 
-            assert signed_data['encap_content_info']['content_type'].native == 'data'
-            #verifier.update(signed_data['encap_content_info']['content'].native)
-            if 'signed_attrs' in signer_info:
-                print('signed attrs added to signature')
-                verifier.update(signer_info['signed_attrs'].dump())
+                assert signed_data['encap_content_info']['content_type'].native == 'data'
+                #verifier.update(signed_data['encap_content_info']['content'].native)
+                if 'signed_attrs' in signer_info:
+                    print('signed attrs added to signature')
+                    verifier.update(signer_info['signed_attrs'].dump())
 
-            # Calculate Digest
-            content_digest = hashes.Hash(hashes.SHA512(), backend=default_backend())  # Was: SHA-256
-            content_digest.update(signed_data['encap_content_info']['content'].native)
-            content_digest_r = content_digest.finalize()
-            # print('expecting SHA-256 digest: {}'.format(b64encode(content_digest_r)))
-            for attr in signer_info['signed_attrs']:
-                if attr['type'].native == 'message_digest':
-                    pass
-                    # print('signer says digest is: {}'.format(b64encode(attr['values'][0].native)))
+                # Calculate Digest
+                content_digest = hashes.Hash(hashes.SHA512(), backend=default_backend())  # Was: SHA-256
+                content_digest.update(signed_data['encap_content_info']['content'].native)
+                content_digest_r = content_digest.finalize()
+                # print('expecting SHA-256 digest: {}'.format(b64encode(content_digest_r)))
+                for attr in signer_info['signed_attrs']:
+                    if attr['type'].native == 'message_digest':
+                        pass
+                        # print('signer says digest is: {}'.format(b64encode(attr['values'][0].native)))
 
-            # Calculate Digest on content + signed attrs
-            cdsa = hashes.Hash(hashes.SHA512(), backend=default_backend())  # Was: SHA-256
-            #cdsa.update(signed_data['encap_content_info']['content'].native)
-            cdsa.update(signer_info['signed_attrs'].dump())
-            cdsa_r = cdsa.finalize()
-            # print('signature digest: {}'.format(b64encode(cdsa_r)))
-            # print('expecting signature: {}'.format(b64encode(signer_info['signature'].native)))
-            # verifier.verify()
+                # Calculate Digest on content + signed attrs
+                cdsa = hashes.Hash(hashes.SHA512(), backend=default_backend())  # Was: SHA-256
+                #cdsa.update(signed_data['encap_content_info']['content'].native)
+                cdsa.update(signer_info['signed_attrs'].dump())
+                cdsa_r = cdsa.finalize()
+                # print('signature digest: {}'.format(b64encode(cdsa_r)))
+                # print('expecting signature: {}'.format(b64encode(signer_info['signature'].native)))
+                # verifier.verify()
 
             # Set the signer for convenience on the instance
             msg._signer_info = signer_info

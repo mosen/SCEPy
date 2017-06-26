@@ -430,8 +430,8 @@ class PKIMessageBuilder(object):
 
         # Calculate digest on encrypted content + signed_attrs
         #digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
-        digest = hashes.Hash(hashes.SHA512(), backend=default_backend())
-        #digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
+        #digest = hashes.Hash(hashes.SHA512(), backend=default_backend())
+        digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
         # digest.update(pkcs_pki_envelope.dump())
         digest.update(pkienvelope_content_info.dump())
         d = digest.finalize()
@@ -447,8 +447,8 @@ class PKIMessageBuilder(object):
 
         # SHA-1 works for macOS
 
-        # da_id = DigestAlgorithmId('sha1')
-        da_id = DigestAlgorithmId('sha512')
+        da_id = DigestAlgorithmId('sha1')
+        #da_id = DigestAlgorithmId('sha512')
         da = DigestAlgorithm({'algorithm': da_id})
         das = DigestAlgorithms([da])
 

@@ -11,7 +11,8 @@ from cryptography.hazmat.primitives import serialization
 from ..enums import MessageType, PKIStatus, FailInfo, CACaps
 from cryptography.hazmat.backends import default_backend
 from ..message import SCEPMessage
-from asn1crypto.cms import ContentInfo
+from asn1crypto.cms import ContentInfo, CertificateSet
+from asn1crypto import x509 as asn1x509
 
 parser = argparse.ArgumentParser()
 parser.add_argument('url', help='The SCEP server URL')
@@ -24,6 +25,18 @@ parser.add_argument('--dump-request', help='dump binary representation of PKCSRe
 parser.add_argument('--dump-response', help='dump binary representation of CertRep to this location')
 
 logger = logging.getLogger(__name__)
+
+
+def certificates_from_asn1(cert_set: CertificateSet) -> List[x509.Certificate]:
+    """Convert an asn1crypto CertificateSet to a list of cryptography.x509.Certificate."""
+    result = list()
+
+    for cert in cert_set:
+        cert_choice = cert.chosen
+        assert isinstance(cert_choice, asn1x509.Certificate)  # Can't handle any other type
+        result.append(x509.load_der_x509_certificate(cert_choice.dump(), default_backend()))
+
+    return result
 
 
 def getcacaps(url: str) -> Set[CACaps]:
@@ -43,7 +56,14 @@ def getcacert(url: str) -> x509.Certificate:
     if res.headers['content-type'] == 'application/x-x509-ca-cert':  # we dont support RA cert yet
         return x509.load_der_x509_certificate(res.content, default_backend())
     elif res.headers['content-type'] == 'application/x-x509-ca-ra-cert':  # intermediate via chain
-        pass # decode cms
+        ci = ContentInfo.load(res.content)
+        #  print(ci['content_type'].native)
+        assert ci['content_type'].native == 'signed_data'
+        signed_data = ci['content']
+        # convert certificates using cryptography lib since it is easier to deal with the decryption
+        assert len(signed_data['certificates']) > 0
+        certs = certificates_from_asn1(signed_data['certificates'])
+        return certs[0]
 
 
 def pkioperation(url: str, data: bytes):
@@ -86,10 +106,10 @@ def pkcsreq(url: str, private_key_path: str = None):
     ssc = generate_self_signed(private_key, csr.subject)
 
     envelope, key, iv = PKCSPKIEnvelopeBuilder().encrypt(
-        csr.public_bytes(serialization.Encoding.DER)
+        csr.public_bytes(serialization.Encoding.DER), '3des'
     ).add_recipient(cacert).finalize()
 
-    signer = Signer(ssc, private_key)
+    signer = Signer(ssc, private_key, 'sha1')
 
     pki_msg_builder = PKIMessageBuilder().message_type(
         MessageType.PKCSReq
