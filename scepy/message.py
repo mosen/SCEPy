@@ -29,13 +29,10 @@ class SCEPMessage(object):
         signed_data = cinfo['content']
 
         # convert certificates using cryptography lib since it is easier to deal with the decryption
-        if len(signed_data['certificates']) > 0:
-            certs = certificates_from_asn1(signed_data['certificates'])
-            print('{} certificate(s) attached to signedData'.format(len(certs)))
-            msg._certificates = certs
-        else:
-            certs = []
-            print('No certificate(s) attached to signedData')
+        assert len(signed_data['certificates']) > 0
+        certs = certificates_from_asn1(signed_data['certificates'])
+        print('{} certificate(s) attached to signedData'.format(len(certs)))
+        msg._certificates = certs
 
         # Iterate through signers and verify the signature for each.
         # Set convenience attributes at the same time
@@ -46,14 +43,12 @@ class SCEPMessage(object):
             assert isinstance(identifier, IssuerAndSerialNumber)  # TODO: also support other signer ids
 
             signer_cert = None
-            if len(certs) > 0:
-                for c in certs:  # find signer cert
-                    if c.serial_number == identifier['serial_number'].native:  # TODO: also convert issuer
-                        signer_cert = c
-                        break
+            for c in certs:  # find signer cert
+                if c.serial_number == identifier['serial_number'].native:  # TODO: also convert issuer
+                    signer_cert = c
+                    break
 
-            # can be none if response is failure
-            # assert signer_cert is not None
+            assert signer_cert is not None
 
             sig_algo = signer_info['signature_algorithm'].signature_algo
             print('Using signature algorithm: {}'.format(sig_algo))
@@ -84,7 +79,7 @@ class SCEPMessage(object):
                     verifier.update(signer_info['signed_attrs'].dump())
 
                 # Calculate Digest
-                content_digest = hashes.Hash(hashes.SHA256(), backend=default_backend())  # Was: SHA-256
+                content_digest = hashes.Hash(hashes.SHA512(), backend=default_backend())  # Was: SHA-256
                 content_digest.update(signed_data['encap_content_info']['content'].native)
                 content_digest_r = content_digest.finalize()
                 # print('expecting SHA-256 digest: {}'.format(b64encode(content_digest_r)))
@@ -94,7 +89,7 @@ class SCEPMessage(object):
                         # print('signer says digest is: {}'.format(b64encode(attr['values'][0].native)))
 
                 # Calculate Digest on content + signed attrs
-                cdsa = hashes.Hash(hashes.SHA256(), backend=default_backend())  # Was: SHA-256
+                cdsa = hashes.Hash(hashes.SHA512(), backend=default_backend())  # Was: SHA-256
                 #cdsa.update(signed_data['encap_content_info']['content'].native)
                 cdsa.update(signer_info['signed_attrs'].dump())
                 cdsa_r = cdsa.finalize()

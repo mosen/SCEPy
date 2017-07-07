@@ -80,7 +80,7 @@ class PKCSPKIEnvelopeBuilder(object):
 
         # TODO: this is horribad and needs abstraction
         if self._encryption_algorithm_id.native == 'tripledes_3key':
-            symkey = TripleDES(os.urandom(24))
+            symkey = TripleDES(os.urandom(8))
             iv = os.urandom(8)
         elif self._encryption_algorithm_id.native == 'aes128_cbc':
             symkey = AES(os.urandom(16))
