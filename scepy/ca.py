@@ -75,7 +75,7 @@ class CertificateAuthority(object):
                 decipher_only=False
             ),
             True
-        ).sign(private_key, hashes.SHA512(), default_backend())  # Was: SHA-256 for macOS
+        ).sign(private_key, hashes.SHA256(), default_backend())
 
         storage.ca_certificate = certificate
 

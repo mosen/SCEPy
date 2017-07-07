@@ -84,7 +84,7 @@ class SCEPMessage(object):
                     verifier.update(signer_info['signed_attrs'].dump())
 
                 # Calculate Digest
-                content_digest = hashes.Hash(hashes.SHA512(), backend=default_backend())  # Was: SHA-256
+                content_digest = hashes.Hash(hashes.SHA256(), backend=default_backend())  # Was: SHA-256
                 content_digest.update(signed_data['encap_content_info']['content'].native)
                 content_digest_r = content_digest.finalize()
                 # print('expecting SHA-256 digest: {}'.format(b64encode(content_digest_r)))
@@ -94,7 +94,7 @@ class SCEPMessage(object):
                         # print('signer says digest is: {}'.format(b64encode(attr['values'][0].native)))
 
                 # Calculate Digest on content + signed attrs
-                cdsa = hashes.Hash(hashes.SHA512(), backend=default_backend())  # Was: SHA-256
+                cdsa = hashes.Hash(hashes.SHA256(), backend=default_backend())  # Was: SHA-256
                 #cdsa.update(signed_data['encap_content_info']['content'].native)
                 cdsa.update(signer_info['signed_attrs'].dump())
                 cdsa_r = cdsa.finalize()
