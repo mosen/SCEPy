@@ -19,3 +19,7 @@ PORT = 5000
 SCEP_CHALLENGE = 'sekret'
 
 
+# Dump the DER data contained in a PKCSReq message to this location
+# PKCSREQ_DUMP = './request.bin'
+
+

@@ -142,5 +142,11 @@ fabric.properties
 
 .idea
 *.iml
-./scepy.cfg
+scepy.cfg
 *.bin
+
+*.crt
+*.key
+*.cer
+*.csr
+*.p12

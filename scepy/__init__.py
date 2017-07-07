@@ -92,8 +92,11 @@ def scep():
             else:
                 msg = request.data
 
-        # with open('request.bin', 'wb') as fd:
-        #     fd.write(msg)
+        dump_request_to = app.config.get('PKCSREQ_DUMP', None)
+        if dump_request_to is not None:
+            app.logger.debug('Dumping request to {}'.format(dump_request_to))
+            with open(dump_request_to, 'wb') as fd:
+                fd.write(msg)
 
         req = SCEPMessage.parse(msg)
         app.logger.debug('Received SCEPMessage, details follow')
