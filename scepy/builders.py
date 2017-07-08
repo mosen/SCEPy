@@ -78,8 +78,7 @@ class Signer(object):
           certificate (x509.Certificate): Signers certificate
           private_key (rsa.RSAPrivateKey): Signers private key
     """
-    signed_digest_algorithm_id = SignedDigestAlgorithmId('rsassa_pkcs1v15')  # was: sha256_rsa
-    signed_digest_algorithm = SignedDigestAlgorithm({'algorithm': signed_digest_algorithm_id, 'parameters': None})
+
 
     def __init__(self,
                  certificate: x509.Certificate,
@@ -96,6 +95,10 @@ class Signer(object):
             'sha512': DigestAlgorithmId('sha512'),
         }[digest_algorithm]
         self.digest_algorithm = DigestAlgorithm({'algorithm': self.digest_algorithm_id})
+
+        self.signed_digest_algorithm_id = SignedDigestAlgorithmId('rsassa_pkcs1v15')  # was: sha256_rsa
+        self.signed_digest_algorithm = SignedDigestAlgorithm({'algorithm': self.signed_digest_algorithm_id,
+                                                              'parameters': None})
 
         if signed_attributes is not None:
             self.signed_attributes = signed_attributes

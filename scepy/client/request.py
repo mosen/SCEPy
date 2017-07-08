@@ -29,9 +29,23 @@ def generate_csr(private_key: rsa.RSAPrivateKey = None) -> Tuple[rsa.RSAPrivateK
     ]))
     builder = builder.add_extension(
         x509.BasicConstraints(ca=False, path_length=None), critical=True
+    ).add_extension(
+        #  Absolutely critical for SCEP
+        x509.KeyUsage(
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=True,
+            data_encipherment=False,
+            key_agreement=False,
+            key_cert_sign=False,
+            crl_sign=False,
+            encipher_only=False,
+            decipher_only=False
+        ),
+        True
     )
     csr = builder.sign(
-        private_key, hashes.SHA512(), default_backend() # Was: SHA-256
+        private_key, hashes.SHA256(), default_backend()
     )
     return private_key, csr
 
@@ -54,11 +68,23 @@ def generate_self_signed(private_key: rsa.RSAPrivateKey, subject: x509.Name) -> 
     builder = builder.not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
     builder = builder.serial_number(x509.random_serial_number())
     builder = builder.public_key(private_key.public_key())
-    
-    # builder = builder.add_extension(
-    #     x509.KeyUsage(digital_signature=True, key_encipherment=True), critical=True
-    # )
-    certificate = builder.sign(private_key=private_key, algorithm=hashes.SHA512(),  # Was: SHA-256
+
+    builder = builder.add_extension(
+        #  Absolutely critical for SCEP
+        x509.KeyUsage(
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=True,
+            data_encipherment=False,
+            key_agreement=False,
+            key_cert_sign=False,
+            crl_sign=False,
+            encipher_only=False,
+            decipher_only=False
+        ),
+        True
+    )
+    certificate = builder.sign(private_key=private_key, algorithm=hashes.SHA256(),
                                backend=default_backend())
     return certificate
 

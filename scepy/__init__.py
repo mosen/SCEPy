@@ -112,6 +112,9 @@ def scep():
                 cacert,
                 cakey,
             )
+            # with open('request.csr', 'wb') as fd:
+            #     fd.write(der_req)
+
 
             cert_req = x509.load_der_x509_csr(der_req, backend=default_backend())
             req_info_bytes = cert_req.tbs_certrequest_bytes

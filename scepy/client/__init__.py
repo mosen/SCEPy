@@ -13,6 +13,7 @@ from cryptography.hazmat.backends import default_backend
 from ..message import SCEPMessage
 from asn1crypto.cms import ContentInfo, CertificateSet
 from asn1crypto import x509 as asn1x509
+from cryptography.x509.oid import NameOID
 
 parser = argparse.ArgumentParser()
 parser.add_argument('url', help='The SCEP server URL')
@@ -103,7 +104,10 @@ def pkcsreq(url: str, private_key_path: str = None):
         with open('scep.key', 'wb') as fd:
             fd.write(pem)
 
-    ssc = generate_self_signed(private_key, csr.subject)
+    ssc = generate_self_signed(private_key, x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, 'SCEPy SCEP SIGNER'),
+        x509.NameAttribute(NameOID.COUNTRY_NAME, 'US'),
+    ]))
 
     envelope, key, iv = PKCSPKIEnvelopeBuilder().encrypt(
         csr.public_bytes(serialization.Encoding.DER), '3des'
@@ -126,11 +130,18 @@ def pkcsreq(url: str, private_key_path: str = None):
     #         fd.write(pki_msg.dump())
     #     logger.debug('Dumped PKCSReq data to {}'.format(args.dump_pkcsreq))
 
+    with open('scepyclient-request.bin', 'wb') as fd:
+        fd.write(pki_msg.dump())
+
+
     res = pkioperation(url, data=pki_msg.dump())
 
     logger.debug('Response: Status {}'.format(res.status_code))
     if res.status_code != 200:
         return -1
+    #
+    # with open('ndes-response.bin', 'wb') as fd:
+
 
     cert_rep = SCEPMessage.parse(res.content)
     # if args.dump_response:
