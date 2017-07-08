@@ -97,8 +97,7 @@ class Signer(object):
         self.digest_algorithm = DigestAlgorithm({'algorithm': self.digest_algorithm_id})
 
         self.signed_digest_algorithm_id = SignedDigestAlgorithmId('rsassa_pkcs1v15')  # was: sha256_rsa
-        self.signed_digest_algorithm = SignedDigestAlgorithm({'algorithm': self.signed_digest_algorithm_id,
-                                                              'parameters': None})
+        self.signed_digest_algorithm = SignedDigestAlgorithm({'algorithm': self.signed_digest_algorithm_id})
 
         if signed_attributes is not None:
             self.signed_attributes = signed_attributes

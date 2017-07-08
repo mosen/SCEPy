@@ -28,8 +28,6 @@ def generate_csr(private_key: rsa.RSAPrivateKey = None) -> Tuple[rsa.RSAPrivateK
         x509.NameAttribute(NameOID.COMMON_NAME, u'scepy2 client'),
     ]))
     builder = builder.add_extension(
-        x509.BasicConstraints(ca=False, path_length=None), critical=True
-    ).add_extension(
         #  Absolutely critical for SCEP
         x509.KeyUsage(
             digital_signature=True,
@@ -45,7 +43,7 @@ def generate_csr(private_key: rsa.RSAPrivateKey = None) -> Tuple[rsa.RSAPrivateK
         True
     )
     csr = builder.sign(
-        private_key, hashes.SHA256(), default_backend()
+        private_key, hashes.SHA512(), default_backend()
     )
     return private_key, csr
 

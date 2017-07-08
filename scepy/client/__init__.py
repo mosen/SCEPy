@@ -113,7 +113,10 @@ def pkcsreq(url: str, private_key_path: str = None):
         csr.public_bytes(serialization.Encoding.DER), '3des'
     ).add_recipient(cacert).finalize()
 
-    signer = Signer(ssc, private_key, 'sha1')
+    with open('scepyclient.csr', 'wb') as fd:
+        fd.write(csr.public_bytes(serialization.Encoding.DER))
+
+    signer = Signer(ssc, private_key, 'sha512')
 
     pki_msg_builder = PKIMessageBuilder().message_type(
         MessageType.PKCSReq
