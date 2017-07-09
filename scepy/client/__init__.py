@@ -50,12 +50,12 @@ def getcacaps(url: str) -> Set[CACaps]:
     return cacaps
 
 
-def getcacert(url: str) -> x509.Certificate:
+def getcacert(url: str) -> List[x509.Certificate]:
     """Query the SCEP Service for the CA Certificate."""
     res = requests.get(url, {'operation': 'GetCACert'})
     assert res.status_code == 200
     if res.headers['content-type'] == 'application/x-x509-ca-cert':  # we dont support RA cert yet
-        return x509.load_der_x509_certificate(res.content, default_backend())
+        return [x509.load_der_x509_certificate(res.content, default_backend())]
     elif res.headers['content-type'] == 'application/x-x509-ca-ra-cert':  # intermediate via chain
         ci = ContentInfo.load(res.content)
         #  print(ci['content_type'].native)
@@ -64,7 +64,7 @@ def getcacert(url: str) -> x509.Certificate:
         # convert certificates using cryptography lib since it is easier to deal with the decryption
         assert len(signed_data['certificates']) > 0
         certs = certificates_from_asn1(signed_data['certificates'])
-        return certs[0]
+        return certs
 
 
 def pkioperation(url: str, data: bytes):
@@ -81,9 +81,10 @@ def pkcsreq(url: str, private_key_path: str = None):
     cacaps = getcacaps(url)
     logger.debug(cacaps)
     logger.info('Request: GetCACert')
-    cacert = getcacert(url)
-    logger.debug('CA Certificate Subject Follows')
-    logger.debug(cacert.subject)
+    ca_certificates = getcacert(url)
+    logger.debug('CA Certificate Subject(s) Follows')
+    for c in ca_certificates:
+        logger.debug(c.subject)
 
     if private_key_path:
         with open(private_key_path, 'rb') as fd:
@@ -109,9 +110,13 @@ def pkcsreq(url: str, private_key_path: str = None):
         x509.NameAttribute(NameOID.COUNTRY_NAME, 'US'),
     ]))
 
-    envelope, key, iv = PKCSPKIEnvelopeBuilder().encrypt(
+    envelope = PKCSPKIEnvelopeBuilder().encrypt(
         csr.public_bytes(serialization.Encoding.DER), '3des'
-    ).add_recipient(cacert).finalize()
+    )
+    for recipient in ca_certificates:
+        envelope = envelope.add_recipient(recipient)
+
+    envelope, key, iv = envelope.finalize()
 
     with open('scepyclient.csr', 'wb') as fd:
         fd.write(csr.public_bytes(serialization.Encoding.DER))
