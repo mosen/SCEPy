@@ -29,10 +29,15 @@ class SCEPMessage(object):
         signed_data = cinfo['content']
 
         # convert certificates using cryptography lib since it is easier to deal with the decryption
-        assert len(signed_data['certificates']) > 0
-        certs = certificates_from_asn1(signed_data['certificates'])
-        print('{} certificate(s) attached to signedData'.format(len(certs)))
-        msg._certificates = certs
+        # assert len(signed_data['certificates']) > 0
+
+        if len(signed_data['certificates']) > 0:
+            certs = certificates_from_asn1(signed_data['certificates'])
+            print('{} certificate(s) attached to signedData'.format(len(certs)))
+            msg._certificates = certs
+        else:
+            certs = None
+            print('No certificates attached to SignedData')
 
         # Iterate through signers and verify the signature for each.
         # Set convenience attributes at the same time
@@ -43,12 +48,13 @@ class SCEPMessage(object):
             assert isinstance(identifier, IssuerAndSerialNumber)  # TODO: also support other signer ids
 
             signer_cert = None
-            for c in certs:  # find signer cert
-                if c.serial_number == identifier['serial_number'].native:  # TODO: also convert issuer
-                    signer_cert = c
-                    break
+            if certs is not None:
+                for c in certs:  # find signer cert
+                    if c.serial_number == identifier['serial_number'].native:  # TODO: also convert issuer
+                        signer_cert = c
+                        break
 
-            assert signer_cert is not None
+            # assert signer_cert is not None
 
             sig_algo = signer_info['signature_algorithm'].signature_algo
             print('Using signature algorithm: {}'.format(sig_algo))
@@ -65,7 +71,7 @@ class SCEPMessage(object):
                 raise ValueError('Unsupported hash algorithm: {}'.format(hash_algo))
 
             assert sig_algo == 'rsassa_pkcs1v15'  # We only support PKCS1v1.5
-            if len(certs) > 0:  # verify content
+            if certs is not None and len(certs) > 0:  # verify content
                 verifier = signer_cert.public_key().verifier(
                     signer_info['signature'].native,
                     asympad.PKCS1v15(),

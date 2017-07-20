@@ -170,7 +170,7 @@ def pkcsreq(url: str, private_key_path: str = None):
         # This should be the PKCS#7 Degenerate
         decrypted_bytes = cert_rep.get_decrypted_envelope_data(ssc, private_key)
         degenerate_info = ContentInfo.load(decrypted_bytes)
-        # degenerate_info.debug()
+        degenerate_info.debug()
 
         assert degenerate_info['content_type'].native == 'signed_data'
         signed_response = degenerate_info['content']
