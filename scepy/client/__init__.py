@@ -113,10 +113,12 @@ def pkcsreq(url: str, private_key_path: str = None):
     envelope = PKCSPKIEnvelopeBuilder().encrypt(
         csr.public_bytes(serialization.Encoding.DER), '3des'
     )
+    # Temporary for MSCEP/NDES
+    #envelope.add_recipient(ca_certificates[1])
 
-    envelope.add_recipient(ca_certificates[1])
-    # for recipient in ca_certificates:
-    #     envelope = envelope.add_recipient(recipient)
+
+    for recipient in ca_certificates:
+        envelope = envelope.add_recipient(recipient)
 
     envelope, key, iv = envelope.finalize()
 

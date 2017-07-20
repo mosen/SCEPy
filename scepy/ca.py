@@ -2,7 +2,7 @@ from flask import g, current_app
 import os
 import datetime
 from cryptography import x509
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import NameOID, ObjectIdentifier
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -125,6 +125,9 @@ class CertificateAuthority(object):
             Instance of x509.Certificate
         """
         serial = self.serial + 1
+        csr_subject = csr.subject
+
+
         builder = x509.CertificateBuilder()
 
         hash_functions = {
@@ -133,8 +136,10 @@ class CertificateAuthority(object):
             'sha512': hashes.SHA512,
         }
 
-        cert = builder.subject_name(
-            csr.subject
+        builder = builder.subject_name(
+            x509.Name([
+                x509.NameAttribute(NameOID.COMMON_NAME, "iOS Client")
+            ])
         ).issuer_name(
             self.certificate.subject
         ).not_valid_before(
@@ -145,7 +150,36 @@ class CertificateAuthority(object):
             serial
         ).public_key(
             csr.public_key()
-        ).sign(self.private_key, hash_functions.get(algorithm, hashes.SHA256)(), default_backend())
+        )
+
+        builder = builder.add_extension(
+            #  Absolutely critical for SCEP
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=True,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False
+            ),
+            True
+        )
+
+        # builder = builder.add_extension(
+        #     x509.ExtendedKeyUsage([ObjectIdentifier('1.3.6.1.5.5.8.2.2')]), False
+        # )
+        #
+        # builder = builder.add_extension(
+        #     x509.SubjectKeyIdentifier.from_public_key(csr.public_key()), False
+        # )
+        #
+        # for requested_extension in csr.extensions:
+        #     builder = builder.add_extension(requested_extension.value, critical=requested_extension.critical)
+
+        cert = builder.sign(self.private_key, hash_functions.get(algorithm, hashes.SHA256)(), default_backend())
 
         self._storage.save_issued_certificate(cert)
         self.serial = serial
