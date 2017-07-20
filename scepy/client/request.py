@@ -82,7 +82,7 @@ def generate_self_signed(private_key: rsa.RSAPrivateKey, subject: x509.Name) -> 
         ),
         True
     )
-    certificate = builder.sign(private_key=private_key, algorithm=hashes.SHA256(),
+    certificate = builder.sign(private_key=private_key, algorithm=hashes.SHA1(),
                                backend=default_backend())
     return certificate
 

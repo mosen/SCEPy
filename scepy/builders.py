@@ -89,11 +89,12 @@ class Signer(object):
         self.certificate = certificate
         self.private_key = private_key
 
-        self.digest_algorithm_id = {
-            'sha1': DigestAlgorithmId('sha1'),
-            'sha256': DigestAlgorithmId('sha256'),
-            'sha512': DigestAlgorithmId('sha512'),
-        }[digest_algorithm]
+        self.digest_algorithm_id = DigestAlgorithmId('sha512')
+        # self.digest_algorithm_id = {
+        #     'sha1': DigestAlgorithmId('sha1'),
+        #     'sha256': DigestAlgorithmId('sha256'),
+        #     'sha512': DigestAlgorithmId('sha512'),
+        # }[digest_algorithm]
         self.digest_algorithm = DigestAlgorithm({'algorithm': self.digest_algorithm_id})
 
         self.signed_digest_algorithm_id = SignedDigestAlgorithmId('rsassa_pkcs1v15')  # was: sha256_rsa
