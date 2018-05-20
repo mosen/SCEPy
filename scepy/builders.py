@@ -37,28 +37,29 @@ def certificates_from_asn1(cert_set: CertificateSet) -> List[x509.Certificate]:
     return result
 
 
-def create_degenerate_certificate(certificate: x509.Certificate) -> ContentInfo:
+def create_degenerate_pkcs7(*certificates: List[x509.Certificate]) -> ContentInfo:
     """Produce a PKCS#7 Degenerate case with a single certificate.
 
     Args:
-          certificate (x509.Certificate): The certificate to attach to the degenerate pkcs#7 payload.
+         *certificates (List[x509.Certificate]): The certificates to attach to the degenerate pkcs#7 payload.
+            The first must always be the issued certificate.
     Returns:
           ContentInfo: The ContentInfo containing a SignedData structure.
     """
-    der_bytes = certificate.public_bytes(
-        serialization.Encoding.DER
-    )
-    asn1cert = parse_certificate(der_bytes)
+    certificates_der = [c.public_bytes(serialization.Encoding.DER) for c in certificates]
+    certificates_asn1 = [parse_certificate(der_bytes) for der_bytes in certificates_der]
 
     empty = ContentInfo({
         'content_type': ContentType('data')
     })
-    
+
+    sd_certificates = CertificateSet([CertificateChoices('certificate', asn1) for asn1 in certificates_asn1])
+
     sd = SignedData({
         'version': CMSVersion(1),
         'encap_content_info': empty,
         'digest_algorithms': DigestAlgorithms([]),
-        'certificates': CertificateSet([CertificateChoices('certificate', asn1cert)]),
+        'certificates': sd_certificates,
         'signer_infos': SignerInfos([]),
         'crls': RevocationInfoChoices([]),
     })

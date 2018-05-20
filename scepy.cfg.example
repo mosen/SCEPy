@@ -18,8 +18,5 @@ PORT = 5000
 # (Optional) SCEP static challenge
 SCEP_CHALLENGE = 'sekret'
 
-
-# Dump the DER data contained in a PKCSReq message to this location
-# PKCSREQ_DUMP = './request.bin'
-
-
+# Raw data will be dumped to this directory for inspection with tools such as OpenSSL
+DUMP_DIR = '/tmp/scepy_dump'

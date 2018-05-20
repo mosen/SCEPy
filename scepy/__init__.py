@@ -1,5 +1,7 @@
-from flask import Flask, abort, request, Response, g
+from flask import Flask, abort, request, Response, g, url_for
 import plistlib
+import os
+import datetime
 from .ca import CertificateAuthority
 from .storage import FileStorage
 from base64 import b64decode, b64encode
@@ -9,7 +11,7 @@ from cryptography.hazmat.backends import default_backend
 from asn1crypto.csr import CertificationRequestInfo
 from .message import SCEPMessage
 from .enums import MessageType, PKIStatus, FailInfo
-from .builders import PKIMessageBuilder, Signer, create_degenerate_certificate
+from .builders import PKIMessageBuilder, Signer, create_degenerate_pkcs7
 from .envelope import PKCSPKIEnvelopeBuilder
 
 # from .admin import admin_app
@@ -57,6 +59,14 @@ with app.app_context():
 @app.route('/', methods=['GET', 'POST'])
 def scep():
     op = request.args.get('operation')
+    app.logger.info("Operation: %s", op)
+
+    dump_dir = app.config.get('DUMP_DIR', None)
+    if dump_dir is not None and not os.path.exists(dump_dir):
+        os.mkdir(dump_dir)
+
+    dump_filename_prefix = "request-{}".format(datetime.datetime.now().timestamp())
+
     if storage.exists():
         g.ca = CertificateAuthority(storage)
     else:
@@ -92,19 +102,16 @@ def scep():
             else:
                 msg = request.data
 
-        dump_request_to = app.config.get('PKCSREQ_DUMP', None)
-        if dump_request_to is not None:
-            app.logger.debug('Dumping request to {}'.format(dump_request_to))
-            with open(dump_request_to, 'wb') as fd:
+        if dump_dir is not None:
+            filename = "{}.bin".format(dump_filename_prefix)
+            app.logger.debug('Dumping request to {}'.format(os.path.join(dump_dir, filename)))
+            with open(os.path.join(dump_dir, filename), 'wb') as fd:
                 fd.write(msg)
 
         req = SCEPMessage.parse(msg)
-        app.logger.debug('Received SCEPMessage, details follow')
-        req.debug()
+        app.logger.debug('Message Type: %s', req.message_type)
 
         if req.message_type == MessageType.PKCSReq or req.message_type == MessageType.RenewalReq:
-            app.logger.debug('received {} SCEP message'.format(MessageType(req.message_type)))
-
             cakey = ca.private_key
             cacert = ca.certificate
 
@@ -112,9 +119,12 @@ def scep():
                 cacert,
                 cakey,
             )
-            # with open('request.csr', 'wb') as fd:
-            #     fd.write(der_req)
 
+            if dump_dir is not None:
+                filename = os.path.join(dump_dir, '{}.csr'.format(dump_filename_prefix))
+                app.logger.debug('Dumping CertificateSigningRequest to {}'.format(os.path.join(dump_dir, filename)))
+                with open(filename, 'wb') as fd:
+                    fd.write(der_req)
 
             cert_req = x509.load_der_x509_csr(der_req, backend=default_backend())
             req_info_bytes = cert_req.tbs_certrequest_bytes
@@ -129,7 +139,7 @@ def scep():
                         if challenge_password != app.config['SCEP_CHALLENGE']:
                             app.logger.warning('Client did not send the correct challenge')
 
-                            signer = Signer(cacert, cakey)
+                            signer = Signer(cacert, cakey, 'sha512')
                             reply = PKIMessageBuilder().message_type(
                                 MessageType.CertRep
                             ).transaction_id(
@@ -142,11 +152,12 @@ def scep():
 
                             return Response(reply.dump(), mimetype='application/x-pki-message')
                         else:
+                            app.logger.debug('Client sent correct challenge')
                             break
 
                     app.logger.warning('Client did not send any challenge password, but there was one configured')
 
-                    signer = Signer(cacert, cakey)
+                    signer = Signer(cacert, cakey, 'sha512')
                     reply = PKIMessageBuilder().message_type(
                         MessageType.CertRep
                     ).transaction_id(
@@ -159,12 +170,13 @@ def scep():
 
                     return Response(reply.dump(), mimetype='application/x-pki-message')
 
-
-            # CA should persist all signed certs itself
             new_cert = ca.sign(cert_req, 'sha512')
-            degenerate = create_degenerate_certificate(new_cert)
-            with open('degenerate.bin', 'wb') as fd:
-                fd.write(degenerate.dump())
+            degenerate = create_degenerate_pkcs7(new_cert, ca.certificate)
+
+            if dump_dir is not None:
+                filename = os.path.join(dump_dir, '{}-degenerate.bin'.format(dump_filename_prefix))
+                with open(filename, 'wb') as fd:
+                    fd.write(degenerate.dump())
 
             envelope, _, _ = PKCSPKIEnvelopeBuilder().encrypt(degenerate.dump(), 'aes256').add_recipient(
                 req.certificates[0]).finalize()
@@ -180,14 +192,16 @@ def scep():
                 req.sender_nonce
             ).pki_envelope(
                 envelope
-            ).certificates(new_cert).add_signer(signer).finalize()
+            ).add_signer(signer).finalize()  # certificates(new_cert)
 
             # res = SCEPMessage.parse(reply.dump())
             # app.logger.debug('Reply with CertRep, details follow')
             # res.debug()
 
-            # with open('/tmp/reply.bin', 'wb') as fd:
-            #     fd.write(reply.dump())
+            if dump_dir is not None:
+                filename = os.path.join(dump_dir, '{}-reply.bin'.format(dump_filename_prefix))
+                with open(filename, 'wb') as fd:
+                    fd.write(reply.dump())
 
             return Response(reply.dump(), mimetype='application/x-pki-message')
         else:
@@ -200,7 +214,7 @@ def scep():
 @app.route('/mobileconfig')
 def mobileconfig():
     """Quick and dirty SCEP enrollment mobileconfiguration profile."""
-    my_url = 'http://localhost:5000'
+    my_url = url_for('scep', _external=True)
 
     profile = {
         'PayloadType': 'Configuration',
@@ -219,12 +233,15 @@ def mobileconfig():
                 'PayloadDescription': 'SCEPy Enrolment Payload',
                 'PayloadContent': {
                     'URL': my_url,
-                    'Name': 'SCEPY-CA',
+                    'Name': 'SCEPY',
                     'Keysize': 2048,
                     'Key Usage': 5
                 }
             }
         ]
     }
+
+    if 'SCEP_CHALLENGE' in app.config:
+        profile['PayloadContent'][0]['PayloadContent']['Challenge'] = app.config['SCEP_CHALLENGE']
 
     return plistlib.dumps(profile), {'Content-Type': 'application/x-apple-aspen-config'}

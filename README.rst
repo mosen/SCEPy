@@ -18,3 +18,14 @@ macOS
 -----
 
 You can visit ``/mobileconfig`` to download a SCEP profile which will enroll you with the service.
+
+Debugging
+---------
+
+Console Log Predicates that are useful:
+
+On iOS:
+
+- Process: profiled
+- Subsystem: com.apple.ManagedConfiguration
+- Category: MC
