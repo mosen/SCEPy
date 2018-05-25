@@ -27,7 +27,7 @@ def scep():
     op = request.args.get('operation')
     current_app.logger.info("Operation: %s", op)
 
-    dump_dir = current_app.config.get('DUMP_DIR', None)
+    dump_dir = current_app.config.get('SCEPY_DUMP_DIR', None)
     if dump_dir is not None and not os.path.exists(dump_dir):
         os.mkdir(dump_dir)
 
@@ -37,9 +37,9 @@ def scep():
         g.ca = CertificateAuthority(storage)
     else:
         subject = x509.Name([
-            x509.NameAttribute(x509.NameOID.COMMON_NAME, current_app.config['CA_X509_CN']),
-            x509.NameAttribute(x509.NameOID.ORGANIZATION_NAME, current_app.config['CA_X509_O']),
-            x509.NameAttribute(x509.NameOID.COUNTRY_NAME, current_app.config['CA_X509_C'])
+            x509.NameAttribute(x509.NameOID.COMMON_NAME, current_app.config['SCEPY_CA_X509_CN']),
+            x509.NameAttribute(x509.NameOID.ORGANIZATION_NAME, current_app.config['SCEPY_CA_X509_O']),
+            x509.NameAttribute(x509.NameOID.COUNTRY_NAME, current_app.config['SCEPY_CA_X509_C'])
         ])
         g.ca = CertificateAuthority.create(storage, subject)
     ca = g.ca
@@ -47,7 +47,7 @@ def scep():
     if op == 'GetCACert':
         certs = [ca.certificate]
 
-        if len(certs) == 1 and not current_app.config.get('FORCE_DEGENERATE_FOR_SINGLE_CERT', False):
+        if len(certs) == 1 and not current_app.config.get('SCEPY_FORCE_DEGENERATE_FOR_SINGLE_CERT', False):
             return Response(certs[0].public_bytes(Encoding.DER), mimetype='application/x-x509-ca-cert')
         elif len(certs):
             raise ValueError('cryptography cannot produce degenerate pkcs7 certs')
@@ -96,13 +96,13 @@ def scep():
             req_info_bytes = cert_req.tbs_certrequest_bytes
 
             # Check the challenge password (unless it is a renewal)
-            if 'SCEP_CHALLENGE' in current_app.config and req.message_type == MessageType.PKCSReq:
+            if 'SCEPY_CHALLENGE' in current_app.config and req.message_type == MessageType.PKCSReq:
                 req_info = CertificationRequestInfo.load(req_info_bytes)
                 for attr in req_info['attributes']:
                     if attr['type'].native == 'challenge_password':
                         assert len(attr['values']) == 1
                         challenge_password = attr['values'][0].native
-                        if challenge_password != current_app.config['SCEP_CHALLENGE']:
+                        if challenge_password != current_app.config['SCEPY_CHALLENGE']:
                             current_app.logger.warning('Client did not send the correct challenge')
 
                             signer = Signer(cacert, cakey, 'sha512')
@@ -121,7 +121,8 @@ def scep():
                             current_app.logger.debug('Client sent correct challenge')
                             break
 
-                    current_app.logger.warning('Client did not send any challenge password, but there was one configured')
+                    current_app.logger.warning(
+                        'Client did not send any challenge password, but there was one configured')
 
                     signer = Signer(cacert, cakey, 'sha512')
                     reply = PKIMessageBuilder().message_type(

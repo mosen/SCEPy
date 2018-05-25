@@ -5,9 +5,9 @@ DEBUG = True
 SCEPY_CA_ROOT = "/path/to/ca"
 
 # X.509 Name Attributes used to generate the CA Certificate
-CA_X509_CN = 'SCEPY-CA'
-CA_X509_O = 'SCEPy'
-CA_X509_C = 'AU'
+SCEPY_CA_X509_CN = 'SCEPY-CA'
+SCEPY_CA_X509_O = 'SCEPy'
+SCEPY_CA_X509_C = 'AU'
 
 # SubjectAltName extension is always on and will use this DNSName
 SAN_DNSNAME = 'scepy.dev'
@@ -16,7 +16,10 @@ SAN_DNSNAME = 'scepy.dev'
 PORT = 5000
 
 # (Optional) SCEP static challenge
-SCEP_CHALLENGE = 'sekret'
+SCEPY_CHALLENGE = 'sekret'
 
-# Raw data will be dumped to this directory for inspection with tools such as OpenSSL
-DUMP_DIR = '/tmp/scepy_dump'
+# Raw data will be dumped to this directory for inspection with tools such as OpenSSL (openssl asn1parse)
+SCEPY_DUMP_DIR = '/tmp/scepy_dump'
+
+
+SCEPY_FORCE_DEGENERATE_FOR_SINGLE_CERT = False
