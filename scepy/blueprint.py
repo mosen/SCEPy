@@ -25,10 +25,11 @@ CACAPS = ('POSTPKIOperation', 'SHA-1', 'SHA-256', 'AES', 'DES3', 'SHA-512', 'Ren
 def scep():
     storage = FileStorage(current_app.config['SCEPY_CA_ROOT'])
     op = request.args.get('operation')
-    current_app.logger.info("Operation: %s", op)
+    current_app.logger.info("Operation: %s, From: %s, User-Agent: %s", op, request.remote_addr, request.user_agent)
 
     dump_dir = current_app.config.get('SCEPY_DUMP_DIR', None)
     if dump_dir is not None and not os.path.exists(dump_dir):
+        current_app.logger.debug("Creating dir for request dumps: %s", dump_dir)
         os.mkdir(dump_dir)
 
     dump_filename_prefix = "request-{}".format(datetime.datetime.now().timestamp())
@@ -76,6 +77,7 @@ def scep():
 
         req = SCEPMessage.parse(msg)
         current_app.logger.debug('Message Type: %s', req.message_type)
+        print(req.debug())
 
         if req.message_type == MessageType.PKCSReq or req.message_type == MessageType.RenewalReq:
             cakey = ca.private_key

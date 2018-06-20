@@ -17,6 +17,8 @@ CMSAttribute._fields = [
     ('values', None),
 ]
 
+def get_digest_method(name='sha1'):
+    pass
 
 class SCEPMessage(object):
 
@@ -28,9 +30,7 @@ class SCEPMessage(object):
         assert cinfo['content_type'].native == 'signed_data'
         signed_data = cinfo['content']
 
-        # convert certificates using cryptography lib since it is easier to deal with the decryption
-        # assert len(signed_data['certificates']) > 0
-
+        # convert certificates from ASN.1 using cryptography lib since it is easier to deal with the decryption
         if len(signed_data['certificates']) > 0:
             certs = certificates_from_asn1(signed_data['certificates'])
             print('{} certificate(s) attached to signedData'.format(len(certs)))
@@ -238,7 +238,9 @@ class SCEPMessage(object):
         return decryptor.update(encrypted_content_bytes) + decryptor.finalize()
 
     def debug(self):
-        out = "{:<20}: {}\n".format('Transaction ID', self.transaction_id)
+        out = "SCEP Message\n"
+        out += "------------\n"
+        out += "{:<20}: {}\n".format('Transaction ID', self.transaction_id)
         out += "{:<20}: {}\n".format('Message Type', self.message_type)
         out += "{:<20}: {}\n".format('PKI Status', self.pki_status)
 
@@ -250,13 +252,22 @@ class SCEPMessage(object):
         print(out)
 
         print('Certificates')
+        print('------------')
         print('Includes {} certificate(s)'.format(len(self.certificates)))
         for c in self.certificates:
             print(c.subject)
+        print()
+
+        print('Signer(s)')
+        print('---------')
+        print()
 
         x509name, serial = self.signer
         print("{:<20}: {}".format('Issuer X.509 Name', x509name))
         # print("{:<20}: {}".format('Issuer S/N', serial))
 
-        print(self._signer_info['signature_algorithm'].native)
+        print("{:<20}: {}".format('Signature Algorithm', self._signer_info['signature_algorithm'].signature_algo))
+        print("{:<20}: {}".format('Digest Algorithm', self._signer_info['digest_algorithm']['algorithm'].native))
+
+
         

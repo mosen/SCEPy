@@ -11,8 +11,15 @@ Getting Started
 **SCEPy** is a Flask based web application which you can run like so::
 
     $ export FLASK_APP=scepy
-    $ export SCEPY_SETTINGS=../scepy.cfg
-    $ flask run
+    $ export SCEPY_SETTINGS=/path/to/scepy.cfg
+    $ flask run --host=0.0.0.0
+
+An example of some configuration is supplied in ``scepy.cfg.example``
+
+Blueprint
+---------
+
+**SCEPy** can also be run as a Flask Blueprint as part of your own application by importing ``scepy.blueprint``.
 
 macOS
 -----
