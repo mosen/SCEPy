@@ -19,7 +19,7 @@ scep_app = Blueprint('scep_app', __name__)
 CACAPS = ('POSTPKIOperation', 'SHA-1', 'SHA-256', 'AES', 'DES3', 'SHA-512', 'Renewal')
 
 
-#@scep_app.route('/', methods=['GET', 'POST'])
+@scep_app.route('/', methods=['GET', 'POST'])
 @scep_app.route('/cgi-bin/pkiclient.exe', methods=['GET', 'POST'])
 @scep_app.route('/scep', methods=['GET', 'POST'])
 def scep():
@@ -55,7 +55,8 @@ def scep():
             # p7_degenerate = degenerate_pkcs7_der(certs)
             # return Response(p7_degenerate, mimetype='application/x-x509-ca-ra-cert')
     elif op == 'GetCACaps':
-        return '\n'.join(CACAPS)
+        return Response('\n'.join(CACAPS), mimetype='text/plain')
+
     elif op == 'PKIOperation':
         if request.method == 'GET':
             msg = request.args.get('message')
@@ -168,6 +169,7 @@ def scep():
                 with open(filename, 'wb') as fd:
                     fd.write(reply.dump())
 
+            current_app.logger.debug("Sending CertRep")
             return Response(reply.dump(), mimetype='application/x-pki-message')
         else:
             current_app.logger.error('unhandled SCEP message type: %d', req.message_type)

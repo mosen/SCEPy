@@ -1,5 +1,6 @@
 import os
 import datetime
+import logging
 from typing import List, Union
 from asn1crypto.core import PrintableString, GeneralizedTime
 from asn1crypto import x509 as asn1x509
@@ -24,6 +25,8 @@ CMSAttribute._fields = [
     ('values', None),
 ]
 
+logger = logging.getLogger(__name__)
+
 
 def certificates_from_asn1(cert_set: CertificateSet) -> List[x509.Certificate]:
     """Convert an asn1crypto CertificateSet to a list of cryptography.x509.Certificate."""
@@ -38,7 +41,10 @@ def certificates_from_asn1(cert_set: CertificateSet) -> List[x509.Certificate]:
 
 
 def create_degenerate_pkcs7(*certificates: List[x509.Certificate]) -> ContentInfo:
-    """Produce a PKCS#7 Degenerate case with a single certificate.
+    """Produce a PKCS#7 Degenerate case.
+
+    The degenerate case is a SignedData content type in which there are no signers. Certificates are disseminated
+    via the ``certificates`` attribute.
 
     Args:
          *certificates (List[x509.Certificate]): The certificates to attach to the degenerate pkcs#7 payload.
@@ -49,6 +55,7 @@ def create_degenerate_pkcs7(*certificates: List[x509.Certificate]) -> ContentInf
     certificates_der = [c.public_bytes(serialization.Encoding.DER) for c in certificates]
     certificates_asn1 = [parse_certificate(der_bytes) for der_bytes in certificates_der]
 
+    # draft-gutmann-scep 3.4. content type must be omitted
     empty = ContentInfo({
         'content_type': ContentType('data')
     })
@@ -90,12 +97,12 @@ class Signer(object):
         self.certificate = certificate
         self.private_key = private_key
 
-        self.digest_algorithm_id = DigestAlgorithmId('sha512')
-        # self.digest_algorithm_id = {
-        #     'sha1': DigestAlgorithmId('sha1'),
-        #     'sha256': DigestAlgorithmId('sha256'),
-        #     'sha512': DigestAlgorithmId('sha512'),
-        # }[digest_algorithm]
+        # self.digest_algorithm_id = DigestAlgorithmId('sha512')
+        self.digest_algorithm_id = {
+            'sha1': DigestAlgorithmId('sha1'),
+            'sha256': DigestAlgorithmId('sha256'),
+            'sha512': DigestAlgorithmId('sha512'),
+        }[digest_algorithm]
         self.digest_algorithm = DigestAlgorithm({'algorithm': self.digest_algorithm_id})
 
         self.signed_digest_algorithm_id = SignedDigestAlgorithmId('rsassa_pkcs1v15')  # was: sha256_rsa
