@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, Integer, Text, String, DateTime, Enum
+from sqlalchemy import Column, Integer, Text, String, DateTime, Enum, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -22,6 +22,11 @@ class CertificateSigningRequest(db.Model):
     der_data = Column(DERSigningRequest, nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow())
+    certificate_id = Column(Integer, ForeignKey('certificates.id'))
+    certificate = relationship(
+        'Certificate',
+        backref='signing_request'
+    )
 
 
 class Certificate(db.Model):
@@ -29,11 +34,6 @@ class Certificate(db.Model):
     der_data = Column(DERCertificate, nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow())
-
-    signing_request = relationship(
-        'CertificateSigningRequest',
-        backref='certificate'
-    )
 
 
 class RevokedCertificate(db.Model):

@@ -7,7 +7,7 @@ setup(
     include_package_data=True,
     author="mosen",
     license="MIT",
-    url="https://github.com/mosen/SCEPy",
+    url="https://github.com/cmdmnt/SCEPy",
     classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: MIT License',
