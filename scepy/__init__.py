@@ -1,3 +1,5 @@
+from flask import Flask
+
 from .ca import CertificateAuthority
 from .storage import FileStorage
 from .message import SCEPMessage
