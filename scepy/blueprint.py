@@ -128,7 +128,7 @@ def scep():
                     current_app.logger.warning(
                         'Client did not send any challenge password, but there was one configured')
 
-                    signer = Signer(cacert, cakey, 'sha512')
+                    signer = Signer(cacert, cakey, 'sha1')
                     reply = PKIMessageBuilder().message_type(
                         MessageType.CertRep
                     ).transaction_id(
@@ -141,7 +141,7 @@ def scep():
 
                     return Response(reply.dump(), mimetype='application/x-pki-message')
 
-            new_cert = ca.sign(cert_req, 'sha512')
+            new_cert = ca.sign(cert_req, 'sha1')
             degenerate = create_degenerate_pkcs7(new_cert, ca.certificate)
 
             if dump_dir is not None:
@@ -151,7 +151,7 @@ def scep():
 
             envelope, _, _ = PKCSPKIEnvelopeBuilder().encrypt(degenerate.dump(), 'aes256').add_recipient(
                 req.certificates[0]).finalize()
-            signer = Signer(cacert, cakey, 'sha512')
+            signer = Signer(cacert, cakey, 'sha1')
 
             reply = PKIMessageBuilder().message_type(
                 MessageType.CertRep
@@ -161,7 +161,7 @@ def scep():
                 PKIStatus.SUCCESS
             ).recipient_nonce(
                 req.sender_nonce
-            ).pki_envelope(
+            ).sender_nonce().pki_envelope(
                 envelope
             ).add_signer(signer).finalize()
 
